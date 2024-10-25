@@ -8,6 +8,7 @@
   let player: any;
   let showBackgroundImage = true;
   let showBackgroundImageError = false;
+  const stopBeforeEnd = 12;
 
   function loadYouTubeAPI() {
     if (!window.YT) {
@@ -56,6 +57,17 @@
   function handlePlayerStateChange(event: any) {
     if (event.data === YT.PlayerState.PLAYING) {
       setTimeout(() => (showBackgroundImage = false), 1000);
+
+      const checkStopInterval = setInterval(() => {
+        const remainingTime = player.getDuration() - player.getCurrentTime();
+        if (remainingTime <= stopBeforeEnd) {
+          player.pauseVideo();
+          player.seekTo(0);
+          player.playVideo();
+          console.log(`Video looped, stopping ${stopBeforeEnd} seconds before the end.`);
+        }
+      }, 1000);
+      
     } else if (event.data === YT.PlayerState.ENDED) {
       player.seekTo(0);
       player.playVideo();

@@ -15,6 +15,7 @@
 	import { tmdbApi, type TmdbMovie2, type TmdbSeries2 } from '../apis/tmdb/tmdb-api';
 	import { writable } from 'svelte/store';
 	import { onMount } from 'svelte';
+	import { _ } from 'svelte-i18n';
 
 	const libraryItemsP = jellyfinApi.getLibraryItems();
 	const sonarrDownloads: Promise<TmdbSeries2[]> = sonarrApi
@@ -116,7 +117,7 @@
 		</div>
 		<CardGrid>
 			{#if $displayedItems.length === 0}
-				<CarouselPlaceholderItems />
+				<CarouselPlaceholderItems size="dynamic" orientation="portrait"/>
 			{:else}
 				{#each $displayedItems as item}
 					<JellyfinCard
@@ -128,7 +129,6 @@
 				{/each}
 			{/if}
 		</CardGrid>
-		<!-- Sentinel div for intersection observer -->
 		<div id="sentinel" style="height: 1px;"></div>
 	</div>
 </DetachedPage>

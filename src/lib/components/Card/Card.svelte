@@ -66,10 +66,9 @@
 					'h-32 w-56': size === 'sm' && orientation === 'landscape',
 					'w-44 h-64': size === 'md' && orientation === 'portrait',
 					'h-44 w-80': size === 'md' && orientation === 'landscape',
-					// 'w-60 h-96': size === 'lg' && orientation === 'portrait',
+					'w-60 h-96': size === 'lg' && orientation === 'portrait',
 					'h-60 w-96': size === 'lg' && orientation === 'landscape',
-					'w-full h-96': size === 'dynamic',
-					'shadow-lg': shadow
+					'w-full h-96': size === 'dynamic'
 				}
 			)}
 			style={`width: ${dimensions.width}px; height: ${dimensions.height}px;`}
