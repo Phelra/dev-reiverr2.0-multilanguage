@@ -50,6 +50,8 @@
 
 
 	const { promise: tmdbSeries, data: tmdbSeriesData } = useRequest(tmdbApi.getTmdbSeries, tmdbId);
+	console.log('TMDb Series :', tmdbSeries);
+	console.log('TMDb Series data :', tmdbSeriesData);
 	let sonarrItem = sonarrApi.getSeriesByTmdbId(tmdbId);
 	const { promise: recommendations } = useRequest(tmdbApi.getSeriesRecommendations, tmdbId);
 	const jellyfinSeries = getJellyfinSeries(id);
@@ -67,6 +69,24 @@
 	$: sonarrEpisodes = Promise.all([sonarrItem, sonarrSeasonNumbers])
 		.then(([item, seasons]) => Promise.all(seasons.map(s => sonarrApi.getEpisodes(item?.id || -1, s))))
 		.then(items => items.flat());	
+
+
+		$: {
+  tmdbSeriesData.subscribe(series => {
+    if (series) {
+      console.log('TMDb Series Data:', series);
+
+      const seasons = series.seasons || [];
+      console.log('Saisons:', seasons);
+
+      seasons.forEach(season => {
+        console.log(`Saison ${season.season_number}:`, season);
+      });
+    }
+  });
+}
+
+
 
 	$: (async () => {
         const item = await sonarrItem;
@@ -501,14 +521,34 @@ function createApprovedRequestDialog(
 							</div>
 						{/if}
 					{/await}
-					{#await nextJellyfinEpisode then nextJellyfinEpisode}
-						<Container
-							direction="horizontal"
-							class="flex mt-8"
-							focusOnMount
-							on:back={handleGoBack}
-							on:mount={registrar}
+					<Container
+						direction="horizontal"
+						class="flex mt-8"
+						focusOnMount
+						on:back={handleGoBack}
+						on:mount={registrar}
+					>
+						<Button
+							class="mr-4"
+							on:clickOrSelect={() => handleRequestSeason()}
+							disabled={!allowRequests}
 						>
+							Request
+							<Plus size={19} slot="icon" />
+						</Button>			
+
+						{#if PLATFORM_WEB}
+							<Button class="mr-4">
+								Open In TMDB
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+							<Button class="mr-4">
+								Open In Jellyfin
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+						{/if}
+
+						{#await nextJellyfinEpisode then nextJellyfinEpisode}
 							{#if nextJellyfinEpisode}
 								<Button
 									class="mr-4"
@@ -520,27 +560,9 @@ function createApprovedRequestDialog(
 									<Play size={19} slot="icon" />
 								</Button>
 							{/if}
-							<Button
-							class="mr-4"
-							on:clickOrSelect={() => handleRequestSeason()}
-							disabled={!allowRequests}
-							>
-							Request
-							<Plus size={19} slot="icon" />
-							</Button>			
+						{/await}
+				</Container>
 
-							{#if PLATFORM_WEB}
-								<Button class="mr-4">
-									Open In TMDB
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-								<Button class="mr-4">
-									Open In Jellyfin
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-							{/if}
-						</Container>
-					{/await}
 				</div>
 			</HeroCarousel>
 		</Container>
