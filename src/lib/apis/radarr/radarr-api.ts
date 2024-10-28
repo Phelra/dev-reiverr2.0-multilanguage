@@ -246,44 +246,6 @@ export class RadarrApi implements Api<paths> {
 	getRadarrDownloadsByTmdbId = (tmdbId: number) =>
 		this.getDownloads().then((downloads) => downloads.filter((d) => d.movie.tmdbId === tmdbId));
 
-
-
-	getDownloadProgressForMovie = async (movieId: number): Promise<{ progress: number, timeLeft: any, estimatedCompletionTime: string } | null> => {
-		const downloads = await this.getDownloads();
-		
-		const downloadsForMovie = downloads.filter(
-		  (download) => download.movie.id === movieId
-		);
-		
-		if (downloadsForMovie.length === 0) {
-		  return null;
-		}
-	
-		let totalSize = 0;
-		let totalDownloaded = 0;
-		let timeLeft = null;
-		let estimatedCompletionTime = "";
-	
-		downloadsForMovie.forEach((download) => {
-		  const size = download.size || 1;
-		  const sizeLeft = download.sizeleft || 0;
-	
-		  if (!estimatedCompletionTime && download.estimatedCompletionTime) {
-			estimatedCompletionTime = download.estimatedCompletionTime;
-		  }
-	
-		  timeLeft = download.timeleft;
-	
-		  totalSize += size;
-		  totalDownloaded += size - sizeLeft;
-		});
-	
-		const progress = (totalDownloaded / totalSize) * 100;
-	
-		return { progress: Math.round(progress), timeLeft, estimatedCompletionTime };
-	};
-
-
 	private lookupRadarrMovieByTmdbId = (tmdbId: number) =>
 		this.getClient()
 			?.GET('/api/v3/movie/lookup/tmdb', {

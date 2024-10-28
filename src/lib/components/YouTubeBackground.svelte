@@ -38,7 +38,8 @@
           start: 3,
           fs: 0,
           disablekb: 1,
-          cc_load_policy: 0
+          cc_load_policy: 0,
+          mute: 1
         },
         events: {
           onReady: () => setTimeout(() => player.playVideo(), 1500),

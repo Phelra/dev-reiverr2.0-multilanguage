@@ -301,7 +301,7 @@
 			}}
 		>
 			<h1 class="header1 mb-2 w-96">Select User</h1>
-			<div class="flex flex-col space-y-4" />
+			<div class="flex flex-col space-y-2" />
 			{#await jellyfinUsers then users}
 				{#each users || [] as user}
 					<SelectItem

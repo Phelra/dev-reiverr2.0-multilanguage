@@ -22,7 +22,7 @@
 	import SonarrMediaManagerModal from '../components/MediaManagerModal/SonarrMediaManagerModal.svelte';
 	import ConfirmDialog from '../components/Dialog/ConfirmDialog.svelte';
 	import { tick } from 'svelte';
-	import { createSerieRequest, createSerieRequestApprouved } from '../components/Requests/requestActions';
+	import { createSerieRequest, createSerieRequestApprouved } from '../components/Requests/requestCreation';
 	import SpinnerModal from '../components/SpinnerModal.svelte';
 	import { getOrAddSeriesToSonarr } from '../components/MediaManagerAuto/addSerieToSonarrAutomatically';
 	import { writable, get } from 'svelte/store';

@@ -115,7 +115,7 @@ export class JellyfinApi implements Api<paths> {
 			  }`
 			: '';
 	}
-
+	
 	async getLibraryItem(itemId: string, refreshCache = false) {
 		const item = await this.getLibraryItems(refreshCache).then((items) =>
 			items.find((i) => i.Id === itemId)

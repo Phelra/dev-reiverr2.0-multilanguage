@@ -29,7 +29,7 @@
   import { handleMovieDownload } from '../components/MediaManagerAuto/AutoDownloadManagerMovie';
   import SpinnerModal from '../components/SpinnerModal.svelte';
   import { writable, get } from 'svelte/store';
-  import { createMovieApprovedRequest, createMovieRequest } from '../components/Requests/requestActions';
+  import { createMovieApprovedRequest, createMovieRequest } from '../components/Requests/requestCreation';
   import { getOrAddMovieToRadarr } from '../components/MediaManagerAuto/addMovieToRadarrAutomatically';
 
   export let id: string;

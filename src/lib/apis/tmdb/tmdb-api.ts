@@ -718,6 +718,13 @@ export const getTmdbSeriesPoster = async (tmdbId: number) =>
 export const getTmdbMoviePoster = async (tmdbId: number) =>
 	getTmdbCache(posterCache, tmdbId, () => getTmdbMovie(tmdbId).then((m) => m?.poster_path));
 
+export const getTmdbMoviePosterLandscape = async (tmdbId: number) =>
+	getTmdbCache(posterCache, tmdbId, () =>
+		getTmdbMovie(tmdbId)
+			.then((m) => m?.images?.posters?.find((poster) => poster.iso_639_1 === 'en')?.file_path)
+	);
+
+
 /** Discover */
 
 export const getTmdbNetworkSeries = (networkId: number) =>

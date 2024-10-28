@@ -123,7 +123,7 @@
 					<JellyfinCard
 						{item}
 						on:enter={scrollIntoView({ all: 64 })}
-						size="dynamic"
+						size="sm"
 						navigateWithType
 					/>
 				{/each}
