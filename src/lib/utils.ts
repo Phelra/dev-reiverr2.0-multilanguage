@@ -12,6 +12,29 @@ export function formatSecondsToTime(seconds: number) {
 	}:${secondsLeft.toString().padStart(2, '0')}`;
 }
 
+export function formatTimeAgo(date: Date): string {
+	const now = new Date();
+	const pastDate = new Date(date);
+	const diffInSeconds = Math.floor((now.getTime() - pastDate.getTime()) / 1000);
+  
+	const minutes = Math.floor(diffInSeconds / 60);
+	const hours = Math.floor(minutes / 60);
+	const days = Math.floor(hours / 24);
+	const weeks = Math.floor(days / 7);
+  
+	if (diffInSeconds < 60) {
+	  return `${diffInSeconds} seconds`;
+	} else if (minutes < 60) {
+	  return `${minutes} minutes`;
+	} else if (hours < 24) {
+	  return `${hours} hours`;
+	} else if (days < 7) {
+	  return `${days} days`;
+	} else {
+	  return `${weeks} weeks`;
+	}
+  }
+
 export function formatMinutesToTime(minutes: number) {
 	const days = Math.floor(minutes / 60 / 24);
 	const hours = Math.floor((minutes / 60) % 24);
@@ -182,4 +205,46 @@ export function getCardDimensions(
 		height: newHeight,
 		columns: cols
 	};
+}
+
+export function calculateMovieReleaseScore(release: Release): number {
+	let points = 0;
+	const sizeGB = (release.size || 0) / (1024 * 1024 * 1024);
+  
+	if (sizeGB < 5) points += 4;
+	else if (sizeGB < 10) points += 3;
+	else if (sizeGB < 15) points += 2;
+	else if (sizeGB < 20) points += 1;
+  
+	if (/\bmulti\b/i.test(release.title)) points += 3;
+	if (release.seeders > 50) {
+		points += 4;} else if (release.seeders > 20) {
+		points += 3;} else if (release.seeders > 10) {
+		points += 2;} else if (release.seeders > 5) {
+		points += 1;}
+  
+	return points;
+  }
+
+  export function calculateSerieReleasePoints(release: Release, selectedSeason: number): number {
+    let points = 0;
+    const sizeGB = (release.size || 0) / (1024 * 1024 * 1024);
+
+    if (sizeGB < 15) points += 4;
+    else if (sizeGB < 25) points += 3;
+    else if (sizeGB < 30) points += 2;
+    else if (sizeGB < 40) points += 1;
+
+    if (/\bmulti\b/i.test(release.title)) points += 3;
+
+    const seasonPattern = new RegExp(`\\bS0${selectedSeason}\\b`, 'i');
+    if (seasonPattern.test(release.title)) points += 6;
+
+	if (release.seeders > 50) {
+		points += 4;} else if (release.seeders > 20) {
+		points += 3;} else if (release.seeders > 10) {
+		points += 2;} else if (release.seeders > 5) {
+		points += 1;}
+
+    return points;
 }

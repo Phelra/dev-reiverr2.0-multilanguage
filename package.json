@@ -70,6 +70,7 @@
 		]
 	},
 	"dependencies": {
-		"gsap": "^3.12.5"
+		"gsap": "^3.12.5",
+		"svelte-loading-spinners": "^0.3.6"
 	}
 }

@@ -1,5 +1,6 @@
 import { ApiProperty, OmitType, PartialType, PickType } from '@nestjs/swagger';
 import { User } from './user.entity';
+import { Request } from '../requests/request.entity';
 
 export class UserDto extends OmitType(User, [
   'password',
@@ -7,6 +8,9 @@ export class UserDto extends OmitType(User, [
 ] as const) {
   @ApiProperty({ type: 'string' })
   profilePicture: string | null;
+
+  @ApiProperty({ type: () => [Request], required: false }) 
+  requests?: Request[];
 
   static fromEntity(entity: User): UserDto {
     return {
@@ -17,6 +21,7 @@ export class UserDto extends OmitType(User, [
       onboardingDone: entity.onboardingDone,
       profilePicture:
         'data:image;base64,' + entity.profilePicture?.toString('base64'),
+      requests: entity.requests,
     };
   }
 }

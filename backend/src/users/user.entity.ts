@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Request } from '../requests/request.entity';
 
 export class SonarrSettings {
   @ApiProperty({ required: true })
@@ -14,22 +15,8 @@ export class SonarrSettings {
   languageProfileId: number;
 }
 
-export class RadarrSettings {
-  @ApiProperty({ required: true })
-  apiKey: string;
-  @ApiProperty({ required: true })
-  baseUrl: string;
-  @ApiProperty({ required: true })
-  qualityProfileId: number;
-  @ApiProperty({ required: true })
-  rootFolderPath: string;
-}
 
 export class JellyfinSettings {
-  @ApiProperty({ required: true })
-  apiKey: string;
-  @ApiProperty({ required: true })
-  baseUrl: string;
   @ApiProperty({ required: true })
   userId: string;
 }
@@ -55,10 +42,6 @@ export class Settings {
   // 	includedLanguages: 'en'
   // },
   @ApiProperty({ required: true, type: SonarrSettings })
-  sonarr: SonarrSettings;
-  @ApiProperty({ required: true, type: RadarrSettings })
-  radarr: RadarrSettings;
-  @ApiProperty({ required: true, type: JellyfinSettings })
   jellyfin: JellyfinSettings;
   @ApiProperty({ required: true, type: TmdbSettings })
   tmdb: TmdbSettings;
@@ -73,22 +56,7 @@ const DEFAULT_SETTINGS: Settings = {
   // 	excludeLibraryItems: true,
   // 	includedLanguages: 'en'
   // },
-  sonarr: {
-    apiKey: '',
-    baseUrl: '',
-    qualityProfileId: 0,
-    rootFolderPath: '',
-    languageProfileId: 0,
-  },
-  radarr: {
-    apiKey: '',
-    baseUrl: '',
-    qualityProfileId: 0,
-    rootFolderPath: '',
-  },
   jellyfin: {
-    apiKey: '',
-    baseUrl: '',
     userId: '',
   },
   tmdb: {
@@ -127,4 +95,7 @@ export class User {
   @ApiProperty({ required: true, type: Settings })
   @Column('json', { default: JSON.stringify(DEFAULT_SETTINGS) })
   settings = DEFAULT_SETTINGS;
+
+  @OneToMany(() => Request, (request) => request.user)
+requests?: Request[];
 }

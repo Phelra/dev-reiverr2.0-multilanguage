@@ -6,7 +6,7 @@ import type { components, paths } from './sonarr.generated';
 import { log } from '../../utils';
 import type { Api, ApiAsync } from '../api.interface';
 import { createLocalStorageStore } from '../../stores/localstorage.store';
-import { user } from '../../stores/user.store';
+import { generalSettings } from '../../stores/generalSettings.store';
 
 export const sonarrMonitorOptions = [
 	'unknown',
@@ -66,15 +66,15 @@ export class SonarrApi implements ApiAsync<paths> {
 	}
 
 	getBaseUrl() {
-		return get(user)?.settings?.sonarr.baseUrl || '';
+		return get(generalSettings)?.data?.integrations?.sonarr?.baseUrl || '';
 	}
 
 	getSettings() {
-		return get(user)?.settings.sonarr;
+		return get(generalSettings)?.data?.integrations?.sonarr;
 	}
 
 	getApiKey() {
-		return get(user)?.settings.sonarr.apiKey;
+		return get(generalSettings)?.data?.integrations?.sonarr?.apiKey;
 	}
 
 	tmdbToTvdb = async (tmdbId: number) => {
@@ -149,7 +149,7 @@ export class SonarrApi implements ApiAsync<paths> {
 		const tmdbSeries = await getTmdbSeries(tmdbId);
 
 		if (!tmdbSeries || !tmdbSeries.external_ids.tvdb_id || !tmdbSeries.name)
-			throw new Error('Movie not found');
+			throw new Error('Series not found');
 
 		const options: SonarrSeriesOptions = {
 			title: tmdbSeries.name,
@@ -348,17 +348,135 @@ export class SonarrApi implements ApiAsync<paths> {
 		);
 	};
 
-	getRootFolders = (): Promise<SonarrRootFolder[]> =>
+	monitorEpisode = (episodeId: number): Promise<void> =>
 		this.getClient().then(
 			(client) =>
-				client?.GET('/api/v3/rootfolder', {}).then((r) => r.data || []) || Promise.resolve([])
+				client
+					?.PUT('/api/v3/episode/monitor', {
+						body: { episodeIds: [episodeId], monitored: true }
+					})
+					.then((res) => {
+						if (res?.response?.status !== 202) {
+							throw new Error(`Failed to monitor episode ${episodeId}: ${res?.statusText || 'No response'}`);
+						}
+					})
+					.catch((error) => {
+						console.error(`Error monitoring episode ${episodeId}:`, error);
+						throw error;
+					})
 		);
+	
+	searchEpisode = (episodeId: number): Promise<void> =>
+		this.getClient().then(
+			(client) =>
+				client
+					?.POST('/api/v3/command', {
+						body: { name: 'EpisodeSearch', episodeIds: [episodeId] }
+					})
+					.then((res) => {
+						if (res?.response?.status !== 201) {
+							throw new Error(`Failed to search for episode ${episodeId}: ${res?.statusText || 'No response'}`);
+						}
+					})
+					.catch((error) => {
+						console.error(`Error searching episode ${episodeId}:`, error);
+						throw error;
+					})
+		);
+	
+	monitorSeason = (seriesId: number, seasonNumber: number, monitored: boolean): Promise<void> =>
+		this.getClient().then((client) =>
+			client
+				?.GET('/api/v3/series/{id}', { params: { path: { id: seriesId } } })
+				.then((res) => res.data)
+				.then((series) => {
+					const updatedSeasons = series.seasons.map((season: any) => ({
+						...season,
+						monitored: season.seasonNumber === seasonNumber ? monitored : season.monitored
+					}));
+					return client
+						?.PUT('/api/v3/series/{id}', {
+							params: { path: { id: seriesId } },
+							body: { ...series, seasons: updatedSeasons }
+						})
+						.then((res) => {
+							if (!res?.response?.ok) {
+								throw new Error(`Failed to monitor season ${seasonNumber} of series ${seriesId}`);
+							}
+						});
+				})
+				.catch((error) => {
+					console.error(`Error monitoring season ${seasonNumber} of series ${seriesId}:`, error);
+					throw error;
+				})
+		);
+	
+	monitorSeries = (seriesId: number, monitored: boolean, monitorNewItems: 'none' | 'all'): Promise<void> =>
+		this.getClient().then(
+			(client) =>
+				client
+					?.GET('/api/v3/series/{id}', { params: { path: { id: seriesId } } })
+					.then((res) => res.data)
+					.then((series) =>
+						client?.PUT('/api/v3/series/{id}', {
+							params: { path: { id: seriesId } },
+							body: { ...series, monitored, monitorNewItems }
+						})
+					)
+					.then((res) => {
+						if (!res?.response?.ok) {
+							throw new Error(`Failed to monitor series ${seriesId}`);
+						}
+					})
+					.catch((error) => {
+						console.error(`Error monitoring series ${seriesId}:`, error);
+						throw error;
+					})
+		);
+	
+	searchSeason = (seriesId: number, seasonNumber: number): Promise<void> =>
+		this.getClient().then(
+			(client) =>
+				client
+					?.POST('/api/v3/command', {
+						body: { name: 'SeasonSearch', seriesId, seasonNumber }
+					})
+					.then((res) => {
+						if (res?.response?.status !== 201) {
+							throw new Error(`Failed to search for season ${seasonNumber} of series ${seriesId}`);
+						}
+					})
+					.catch((error) => {
+						console.error(`Error searching season ${seasonNumber} of series ${seriesId}:`, error);
+						throw error;
+					})
+		);
+	
 
-	getQualityProfiles = (): Promise<SonarrQualityProfile[]> =>
-		this.getClient().then(
-			(client) =>
-				client?.GET('/api/v3/qualityprofile', {}).then((r) => r.data || []) || Promise.resolve([])
-		);
+		isSeasonFullyDownloaded = async (seriesId: number, seasonNumber: number): Promise<boolean> => {
+			try {
+				const series = await this.getSeriesById(seriesId);
+				if (!series) {
+					return false;
+				}
+		
+				const season = series.seasons.find(season => season.seasonNumber === seasonNumber);
+				if (!season) {
+					return false;
+				}
+		
+				const episodes = await this.getEpisodes(seriesId, seasonNumber);
+				const airedEpisodes = episodes.filter(episode => new Date(episode.airDate) <= new Date());
+				const downloadedEpisodes = episodes.filter(episode => episode.hasFile);
+		
+				return downloadedEpisodes.length >= airedEpisodes.length && airedEpisodes.length > 0;
+				
+			} catch (error) {
+				return false;
+			}
+		};
+		
+		
 
 	// getSonarrEpisodes = async (seriesId: number) => {
 	// 	const episodesPromise =
@@ -391,7 +509,6 @@ export class SonarrApi implements ApiAsync<paths> {
 	// 		episodeFile: episodeFiles.find((file) => file.id === episode.episodeFileId)
 	// 	}));
 	// };
-
 	getHealth = async (
 		baseUrl: string | undefined = undefined,
 		apiKey: string | undefined = undefined
@@ -404,7 +521,7 @@ export class SonarrApi implements ApiAsync<paths> {
 			})
 			.catch((e) => e.response);
 
-	_getSonarrRootFolders = async (
+	getSonarrRootFolders = async (
 		baseUrl: string | undefined = undefined,
 		apiKey: string | undefined = undefined
 	) =>

@@ -3,13 +3,11 @@
 	import Tab from '../components/Tab/Tab.svelte';
 	import Button from '../components/Button.svelte';
 	import { tmdbApi } from '../apis/tmdb/tmdb-api';
-	import { ArrowLeft, ArrowRight, CheckCircled, ExternalLink } from 'radix-icons-svelte';
+	import { ArrowLeft, ArrowRight, CheckCircled, ExternalLink, Upload } from 'radix-icons-svelte';
 	import TextField from '../components/TextField.svelte';
 	import { jellyfinApi, type JellyfinUser } from '../apis/jellyfin/jellyfin-api';
 	import SelectField from '../components/SelectField.svelte';
 	import SelectItem from '../components/SelectItem.svelte';
-	import { sonarrApi } from '../apis/sonarr/sonarr-api';
-	import { radarrApi } from '../apis/radarr/radarr-api';
 	import { useTabs } from '../components/Tab/Tab';
 	import classNames from 'classnames';
 	import { user } from '../stores/user.store';
@@ -17,16 +15,16 @@
 	import Panel from '../components/Panel.svelte';
 	import TmdbIntegrationConnect from '../components/Integrations/TmdbIntegrationConnect.svelte';
 	import JellyfinIntegration from '../components/Integrations/JellyfinIntegration.svelte';
-	import SonarrIntegration from '../components/Integrations/SonarrIntegration.svelte';
-	import RadarrIntegration from '../components/Integrations/RadarrIntegration.svelte';
 	import TmdbIntegration from '../components/Integrations/TmdbIntegration.svelte';
+	import { generalSettings } from '../stores/generalSettings.store';
+	import { getRandomProfilePicture, profilePictures } from '../profile-pictures';
+	import ProfileIcon from '../components/ProfileIcon.svelte';
 
 	enum Tabs {
 		Welcome,
+		ProfilePicture,
 		Tmdb,
 		Jellyfin,
-		Sonarr,
-		Radarr,
 		Complete,
 
 		SelectUser = Jellyfin + 0.1,
@@ -34,6 +32,34 @@
 	}
 
 	const tab = useTabs(Tabs.Welcome, { ['class']: 'w-max max-w-lg' });
+	const adminTmdbConfigured = $generalSettings?.data?.integrations?.tmdb?.sessionId?.length ?? 0 > 0;
+	let profilePictureBase64: string = profilePictures.leo;
+	let profilePictureTitle: string = 'Leo';
+	let profilePictureFilesInput: HTMLInputElement;
+	let profilePictureFiles: FileList;
+
+	async function setProfilePicture(image: string, title: string) {
+		profilePictureBase64 = image;
+		profilePictureTitle = title;
+
+		await user.updateUser((prev) => ({
+			...prev,
+			profilePicture: image,
+		}));
+		tab.next();
+	}
+
+	async function handleProfilePictureUpload() {
+		const file = profilePictureFiles?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onload = () => {
+			const image = reader.result as string;
+			setProfilePicture(image, 'Custom');
+			};
+			reader.readAsDataURL(file); 
+		}
+	}
 
 	$: connectedTmdbAccount = $user?.settings.tmdb.userId && tmdbApi.getAccountDetails();
 
@@ -75,37 +101,100 @@
 			</Container>
 		</Tab>
 
+		<Tab {...tab} tab={Tabs.ProfilePicture}>
+			<h1 class="header2 mb-6">Select Profile Picture</h1>
+			<Container direction="grid" gridCols={3} class="grid grid-cols-3 gap-4 w-max">
+				<ProfileIcon
+				url={profilePictures.ana}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.ana, 'Ana')}
+				focusOnMount={profilePictureBase64 === profilePictures.ana}
+			  />
+			  <ProfileIcon
+				url={profilePictures.emma}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.emma, 'Emma')}
+				focusOnMount={profilePictureBase64 === profilePictures.emma}
+			  />
+			  <ProfileIcon
+				url={profilePictures.glen}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.glen, 'Glen')}
+				focusOnMount={profilePictureBase64 === profilePictures.glen}
+			  />
+			  <ProfileIcon
+				url={profilePictures.henry}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.henry, 'Henry')}
+				focusOnMount={profilePictureBase64 === profilePictures.henry}
+			  />
+			  <ProfileIcon
+				url={profilePictures.keanu}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.keanu, 'Keanu')}
+				focusOnMount={profilePictureBase64 === profilePictures.keanu}
+			  />
+			  <ProfileIcon
+				url={profilePictures.leo}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.leo, 'Leo')}
+				focusOnMount={profilePictureBase64 === profilePictures.leo}
+			  />
+			  <ProfileIcon
+				url={profilePictures.sydney}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.sydney, 'Sydney')}
+				focusOnMount={profilePictureBase64 === profilePictures.sydney}
+			  />
+			  <ProfileIcon
+				url={profilePictures.zendaya}
+				on:clickOrSelect={() => setProfilePicture(profilePictures.zendaya, 'Zendaya')}
+				focusOnMount={profilePictureBase64 === profilePictures.zendaya}
+			  />
+			  <ProfileIcon
+				url="profile-pictures/leo.webp"
+				on:clickOrSelect={() => profilePictureFilesInput?.click()}
+				icon={Upload}
+				/>
+				<input
+				bind:this={profilePictureFilesInput}
+				type="file"
+				bind:files={profilePictureFiles}
+				accept="image/png, image/jpeg"
+				class="hidden"
+				on:change={handleProfilePictureUpload}
+			/>
+			</Container>
+			<Container direction="horizontal" class="flex space-x-4 *:flex-1 mt-4">
+				<Button type="primary-dark" on:clickOrSelect={() => tab.previous()}>Back</Button>
+				<Button focusedChild type="primary-dark" on:clickOrSelect={() => tab.next()}>
+					Next
+				</Button>
+			</Container>
+		</Tab>
+		
+
 		<Tab {...tab} tab={Tabs.Tmdb}>
 			<h1 class="header2 mb-2">Connect a TMDB Account</h1>
-			<div class="body mb-8">
-				Connect to TMDB for personalized recommendations based on your movie reviews and
-				preferences.
+			<div class="body mb-4">
+				Connect to TMDB for personalized recommendations based on your movie reviews and preferences.
 			</div>
-
-			<TmdbIntegration handleConnectTmdb={() => tab.set(Tabs.TmdbConnect)} let:connected>
+			
+			<TmdbIntegration let:connected>
 				{#if !connected}
-					{#if !$user?.settings.tmdb.userId}
-						<Button
-							type="primary-dark"
-							on:clickOrSelect={() => {
-								tab.set(Tabs.TmdbConnect);
-							}}
-						>
-							Connect
-						</Button>
-					{/if}
+					<div class="flex flex-col space-y-4 mt-4">
+						<p class="mb-4" class:text-yellow-500={adminTmdbConfigured} class:text-red-500={!adminTmdbConfigured}>
+							{adminTmdbConfigured 
+								? 'You are using the admin TMDb account because you have not connected your own account.' 
+								: 'The administrator has not configured their TMDb account for the best experience. Please connect your own account.'}
+						</p>
+						{#if !$user?.settings.tmdb.userId}
+							<Button type="primary-dark" on:clickOrSelect={() => tab.set(Tabs.TmdbConnect)}>
+								Connect your own TMDb account
+							</Button>
+						{/if}
+					</div>
 				{/if}
 				<Container direction="horizontal" class="flex space-x-4 *:flex-1 mt-4">
 					<Button type="primary-dark" on:clickOrSelect={() => tab.previous()}>Back</Button>
 					<Button focusedChild type="primary-dark" on:clickOrSelect={() => tab.next()}>
-						{#if connected}
-							Next
-						{:else}
-							Skip
-						{/if}
+						{connected ? 'Next' : 'Skip'}
 					</Button>
 				</Container>
-			</TmdbIntegration>
+			</TmdbIntegration>			
 
 			<!--			<div class="space-y-4 flex flex-col">-->
 			<!--				{#await connectedTmdbAccount then account}-->
@@ -208,7 +297,7 @@
 			}}
 		>
 			<h1 class="header1 mb-2 w-96">Select User</h1>
-			<div class="flex flex-col space-y-4" />
+			<div class="grid gap-2">
 			{#await jellyfinUsers then users}
 				{#each users || [] as user}
 					<SelectItem
@@ -222,54 +311,6 @@
 					</SelectItem>
 				{/each}
 			{/await}
-		</Tab>
-
-		<Tab {...tab} tab={Tabs.Sonarr}>
-			<h1 class="header2 mb-2">Connect to Sonarr</h1>
-			<div class="mb-8">Connect to Sonarr for requesting and managing tv shows.</div>
-
-			<SonarrIntegration let:stale let:handleSave let:empty let:unchanged>
-				<Container direction="horizontal" class="grid grid-cols-2 gap-4 mt-4">
-					<Button type="primary-dark" on:clickOrSelect={() => tab.previous()}>Back</Button>
-					{#if empty || unchanged}
-						<Button focusedChild type="primary-dark" on:clickOrSelect={() => tab.next()}>
-							{empty ? 'Skip' : 'Next'}
-						</Button>
-					{:else}
-						<Button
-							type="primary-dark"
-							disabled={!stale}
-							action={() => handleSave().then(tab.next)}
-						>
-							Connect
-						</Button>
-					{/if}
-				</Container>
-			</SonarrIntegration>
-		</Tab>
-
-		<Tab {...tab} tab={Tabs.Radarr}>
-			<h1 class="header2 mb-2">Connect to Radarr</h1>
-			<div class="mb-8">Connect to Radarr for requesting and managing movies.</div>
-
-			<RadarrIntegration let:stale let:handleSave let:empty let:unchanged>
-				<Container direction="horizontal" class="grid grid-cols-2 gap-4 mt-4">
-					<Button type="primary-dark" on:clickOrSelect={() => tab.previous()}>Back</Button>
-					{#if empty || unchanged}
-						<Button focusedChild type="primary-dark" on:clickOrSelect={() => tab.next()}>
-							{empty ? 'Skip' : 'Next'}
-						</Button>
-					{:else}
-						<Button
-							type="primary-dark"
-							disabled={!stale}
-							action={() => handleSave().then(tab.next)}
-						>
-							Connect
-						</Button>
-					{/if}
-				</Container>
-			</RadarrIntegration>
 		</Tab>
 
 		<Tab {...tab} tab={Tabs.Complete} class={classNames('w-full')}>
