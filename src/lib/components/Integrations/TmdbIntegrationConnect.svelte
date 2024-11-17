@@ -2,11 +2,14 @@
 	import Container from '../../../Container.svelte';
 	import { tmdbApi } from '../../apis/tmdb/tmdb-api';
 	import Button from '../Button.svelte';
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { createEventDispatcher } from 'svelte';
 	import { ExternalLink } from 'radix-icons-svelte';
+	import { generalSettings } from '../../stores/generalSettings.store';
 	import { user } from '../../stores/user.store';
+	import { get } from 'svelte/store';
 
 	const dispatch = createEventDispatcher<{ connected: null }>();
+	const isAdmin = get(user)?.isAdmin;
 
 	let tmdbConnectRequestToken: string | undefined = undefined;
 	let tmdbConnectLink: string | undefined = undefined;
@@ -17,7 +20,7 @@
 
 	async function handleGenerateTMDBLink() {
 		return tmdbApi.getConnectAccountLink().then((res) => {
-			if (res?.status_code !== 1) return; // TODO add notification
+			if (res?.status_code !== 1) return; // TODO: Add notification
 			const link = `https://www.themoviedb.org/auth/access?request_token=${res?.request_token}`;
 			const qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${link}`;
 			tmdbConnectRequestToken = res?.request_token;
@@ -32,10 +35,25 @@
 			const { status_code, access_token, account_id } = res || {};
 			if (status_code !== 1 || !access_token || !account_id) {
 				tmdbError = 'Failed to connect account. Did you approve the request?';
-				return; // TODO add notification
+				return; // TODO: Add notification
 			}
 
-			user.updateUser((prev) => ({
+			if (isAdmin) {
+				console.log('Admin is connecting their TMDb account');
+				generalSettings.updateSettings((prev) => ({
+					...prev,
+					integrations: {
+						...prev.integrations,
+						tmdb: {
+							userId: account_id,
+							sessionId: access_token
+						}
+					}
+				}));
+			}
+			else {
+				console.log('User is connecting their own TMDb account');
+				user.updateUser((prev) => ({
 				...prev,
 				settings: {
 					...prev.settings,
@@ -44,8 +62,9 @@
 						sessionId: access_token
 					}
 				}
-			}));
+				}));
 
+			}
 			dispatch('connected');
 		});
 	}

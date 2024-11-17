@@ -18,6 +18,7 @@
 	import { navigate } from '../StackRouter/StackRouter';
 	import Toggle from '../Toggle.svelte';
 	import { get } from 'svelte/store';
+	
 
 	enum Tabs {
 		EditProfile,

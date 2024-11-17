@@ -6,7 +6,8 @@
 		Gear,
 		Laptop,
 		MagnifyingGlass,
-		Person
+		Person,
+		Timer
 	} from 'radix-icons-svelte';
 	import classNames from 'classnames';
 	import { get, type Readable, writable, type Writable } from 'svelte/store';
@@ -24,7 +25,8 @@
 		Movies,
 		Library,
 		Search,
-		Manage
+		RequestsPage,
+		Manage,		
 	}
 
 	const tab = useTabs(Tabs.Series);
@@ -60,7 +62,8 @@
 				[Tabs.Movies]: '/movies',
 				[Tabs.Library]: '/library',
 				[Tabs.Search]: '/search',
-				[Tabs.Manage]: '/manage'
+				[Tabs.Manage]: '/manage',
+				[Tabs.RequestsPage]: '/requests'
 			}[index] || '/';
 		navigate(path);
 		selectedIndex = index;
@@ -79,6 +82,7 @@
 						'/movies': Tabs.Movies,
 						'/library': Tabs.Library,
 						'/search': Tabs.Search,
+						'/requests': Tabs.RequestsPage,
 						'/manage': Tabs.Manage
 					}[bottomPage.route.path] ?? -1;
 				selectable.focusIndex.set(activeIndex);
@@ -121,32 +125,33 @@
 	/>
 
 	<Container
-		class="w-full h-12 cursor-pointer"
-		on:clickOrSelect={() => sessions.setActiveSession()}
-		let:hasFocus
+	class="w-full cursor-pointer py-2"
+	on:clickOrSelect={() => sessions.setActiveSession()}
+	let:hasFocus
+>
+	<div
+		class={classNames(
+			'w-full h-full relative flex flex-col items-start justify-center transition-opacity',
+			{
+				'text-primary-500': hasFocus || (!$isNavBarOpen && selectedIndex === Tabs.Users),
+				'text-stone-300 hover:text-primary-500':
+					!hasFocus && !(!$isNavBarOpen && selectedIndex === Tabs.Users),
+				'opacity-0 pointer-events-none': $isNavBarOpen === false,
+				'group-hover:opacity-100 group-hover:pointer-events-auto': true
+			}
+		)}
 	>
-		<div
-			class={classNames(
-				'w-full h-full relative flex items-center justify-center transition-opacity',
-				{
-					'text-primary-500': hasFocus || (!$isNavBarOpen && selectedIndex === Tabs.Users),
-					'text-stone-300 hover:text-primary-500':
-						!hasFocus && !(!$isNavBarOpen && selectedIndex === Tabs.Users),
-					'opacity-0 pointer-events-none': $isNavBarOpen === false,
-					'group-hover:opacity-100 group-hover:pointer-events-auto': true
-				}
-			)}
-		>
-			<div class="absolute inset-y-0 left-2 flex items-center justify-center">
-				<DotFilled
-					class={classNames('text-primary-500', { 'opacity-0': activeIndex !== Tabs.Users })}
-					size={19}
-				/>
-			</div>
+					<!-- User icon, dot, and name -->
+		<div class="flex items-center space-x-2">
+			<!-- Dot Icon -->
+			<DotFilled
+				class={classNames('text-primary-500', { 'opacity-0': activeIndex !== Tabs.Users })}
+				size={19}
+			/>
 			<Person class="w-8 h-8" />
 			<span
 				class={classNames(
-					'text-xl font-medium transition-opacity flex items-center absolute inset-y-0 left-20',
+					'text-lg font-semibold',
 					{
 						'opacity-0 pointer-events-none': $isNavBarOpen === false,
 						'group-hover:opacity-100 group-hover:pointer-events-auto': true
@@ -156,7 +161,8 @@
 				{$user?.name}
 			</span>
 		</div>
-	</Container>
+	</div>
+</Container>
 
 	<div class={'flex-1 flex flex-col justify-center self-stretch'}>
 		<Container
@@ -289,6 +295,45 @@
 			</div>
 		</Container>
 	</div>
+
+
+	<Container
+		class="w-full h-12 cursor-pointer"
+		on:clickOrSelect={selectIndex(Tabs.RequestsPage)}
+		let:hasFocus
+	>
+		<div
+			class={classNames(
+				'w-full h-full relative flex items-center justify-center transition-opacity',
+				{
+					'text-primary-500': hasFocus || (!$isNavBarOpen && selectedIndex === Tabs.RequestsPage),
+					'text-stone-300 hover:text-primary-500':
+						!hasFocus && !(!$isNavBarOpen && selectedIndex === Tabs.RequestsPage),
+					'opacity-0 pointer-events-none': $isNavBarOpen === false,
+					'group-hover:opacity-100 group-hover:pointer-events-auto': true
+				}
+			)}
+		>
+			<div class="absolute inset-y-0 left-2 flex items-center justify-center">
+				<DotFilled
+					class={classNames('text-primary-500', { 'opacity-0': activeIndex !== Tabs.RequestsPage })}
+					size={19}
+				/>
+			</div>
+			<Timer class="w-8 h-8" />
+			<span
+				class={classNames(
+					'text-xl font-medium transition-opacity flex items-center absolute inset-y-0 left-20',
+					{
+						'opacity-0 pointer-events-none': $isNavBarOpen === false,
+						'group-hover:opacity-100 group-hover:pointer-events-auto': true
+					}
+				)}
+			>
+				Requests
+			</span>
+		</div>
+	</Container>
 
 	<Container
 		class="w-full h-12 cursor-pointer"

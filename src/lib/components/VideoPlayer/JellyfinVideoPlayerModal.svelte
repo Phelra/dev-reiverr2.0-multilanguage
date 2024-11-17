@@ -12,7 +12,7 @@
 	import { get } from 'svelte/store';
 	import { ISO_2_LANGUAGES } from '../../utils/iso-2-languages';
 	import Modal from '../Modal/Modal.svelte';
-	import { user } from '../../stores/user.store';
+	import { generalSettings } from '../../stores/generalSettings.store';
 
 	type MediaLanguageStore = {
 		subtitles?: string;
@@ -23,6 +23,8 @@
 	export let modalId: symbol;
 	export let hidden: boolean = false;
 
+	const jellyfinSettings = get(generalSettings)?.data?.integrations?.jellyfin;
+	const baseUrl = jellyfinSettings?.baseUrl;
 	const itemP = jellyfinApi.getLibraryItem(id);
 
 	let title: string = '';
@@ -115,7 +117,7 @@
 				subtitles = {
 					kind: 'subtitles',
 					srclang: stream.Language || '',
-					url: `${$user?.settings.jellyfin.baseUrl}/Videos/${id}/${mediaSource?.Id}/Subtitles/${stream.Index}/${stream.Level}/Stream.vtt`,
+					url: `${baseUrl}/Videos/${id}/${mediaSource?.Id}/Subtitles/${stream.Index}/${stream.Level}/Stream.vtt`,
 					// @ts-ignore
 					language: ISO_2_LANGUAGES[stream?.Language || '']?.name || 'English'
 				};
@@ -126,7 +128,7 @@
 			mediaSource?.MediaStreams?.filter((s) => s.Type === 'Subtitle').map((s) => ({
 				kind: 'subtitles' as const,
 				srclang: s.Language || '',
-				url: `${$user?.settings.jellyfin.baseUrl}/Videos/${id}/${mediaSource?.Id}/Subtitles/${s.Index}/${s.Level}/Stream.vtt`,
+				url: `${baseUrl}/Videos/${id}/${mediaSource?.Id}/Subtitles/${s.Index}/${s.Level}/Stream.vtt`,
 				language: 'English'
 			})) || [];
 
@@ -170,9 +172,9 @@
 					playbackPosition: progressTime * 10_000_000
 				}),
 			directPlay,
-			playbackUrl: $user?.settings.jellyfin.baseUrl + playbackUri,
+			playbackUrl: baseUrl + playbackUri,
 			backdrop: item?.BackdropImageTags?.length
-				? `${$user?.settings.jellyfin.baseUrl}/Items/${item?.Id}/Images/Backdrop?quality=100&tag=${item?.BackdropImageTags?.[0]}`
+				? `${baseUrl}/Items/${item?.Id}/Images/Backdrop?quality=100&tag=${item?.BackdropImageTags?.[0]}`
 				: '',
 			startTime:
 				(options.playbackPosition || 0) / 10_000_000 ||

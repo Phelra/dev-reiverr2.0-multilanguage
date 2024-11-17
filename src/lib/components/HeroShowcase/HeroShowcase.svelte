@@ -16,18 +16,28 @@
 	}>();
 
 	export let items: Promise<ShowcaseItemProps[]> = Promise.resolve([]);
-	let awaitedItems: undefined | ShowcaseItemProps[];
+	let awaitedItems: ShowcaseItemProps[] | undefined;
 	items.then((items) => (awaitedItems = items));
 
 	function openItem() {
-		if (awaitedItems) dispatch('select', awaitedItems[showcaseIndex]);
-	}
-
+			if (awaitedItems) dispatch('select', awaitedItems[showcaseIndex]);
+		}
+	
 	let showcaseIndex = 0;
+
+	let urls: Promise<{ backdropUrl: string; trailerUrl: string }[]> = items.then((items) => {
+		const result = items.map((i) => ({
+			backdropUrl: `${TMDB_IMAGES_ORIGINAL}${i.backdropUrl}`,
+			trailerUrl: i.trailerUrl || ''
+		}));
+		return result;
+});
+	
+
 </script>
 
 <HeroCarousel
-	urls={items.then((items) => items.map((i) => `${TMDB_IMAGES_ORIGINAL}${i.backdropUrl}`))}
+	urls={urls}
 	bind:index={showcaseIndex}
 	on:enter
 	on:navigate={({ detail }) => {

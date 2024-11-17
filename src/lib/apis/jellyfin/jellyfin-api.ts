@@ -3,6 +3,7 @@ import { get } from 'svelte/store';
 import type { components, paths } from './jellyfin.generated';
 import type { Api } from '../api.interface';
 import { user } from '../../stores/user.store';
+import { generalSettings } from '../../stores/generalSettings.store';
 import type { DeviceProfile } from './playback-profiles';
 import axios from 'axios';
 import { log } from '../../utils';
@@ -16,7 +17,7 @@ export const JELLYFIN_DEVICE_ID = 'Reiverr Client';
 
 export class JellyfinApi implements Api<paths> {
 	getClient() {
-		const jellyfinSettings = get(user)?.settings.jellyfin;
+		const jellyfinSettings = get(generalSettings)?.data?.integrations?.jellyfin;
 		const baseUrl = jellyfinSettings?.baseUrl;
 		const apiKey = jellyfinSettings?.apiKey;
 
@@ -33,15 +34,15 @@ export class JellyfinApi implements Api<paths> {
 	}
 
 	getApiKey() {
-		return get(user)?.settings.jellyfin.apiKey || '';
+		return get(generalSettings)?.data?.integrations?.jellyfin?.apiKey || '';
 	}
 
 	getBaseUrl() {
-		return get(user)?.settings.jellyfin.baseUrl || '';
+		return get(generalSettings)?.data?.integrations?.jellyfin?.baseUrl || '';
 	}
 
-	getContinueWatching = async (type?: Type): Promise<JellyfinItem[] | undefined> =>
-		this.getClient()
+	getContinueWatching = async (): Promise<JellyfinItem[] | undefined> => {
+		const items = await this.getClient()
 			.GET('/Users/{userId}/Items/Resume', {
 				params: {
 					path: {
@@ -49,12 +50,13 @@ export class JellyfinApi implements Api<paths> {
 					},
 					query: {
 						mediaTypes: ['Video'],
-						fields: ['ProviderIds', 'Genres'],
-						...(type ? { parentId: await this.getViewId(type) } : {})
+						fields: ['ProviderIds', 'Genres']
 					}
 				}
 			})
 			.then((r) => r.data?.Items || []);
+			return items?.filter(item => item.Type === 'Movie');
+	};
 
 	getContinueWatchingSeries = async () => {
 		const seriesIds = [
@@ -104,15 +106,16 @@ export class JellyfinApi implements Api<paths> {
 	}
 
 	getPosterUrl(item: JellyfinItem, quality = 100, original = false) {
+		const baseUrl = get(generalSettings)?.data?.integrations?.jellyfin?.baseUrl || '';
 		return item.ImageTags?.Primary
-			? `${get(user)?.settings.jellyfin.baseUrl}/Items/${
+			? `${baseUrl}/Items/${
 					item?.Id
 			  }/Images/Primary?quality=${quality}${original ? '' : '&fillWidth=432'}&tag=${
 					item?.ImageTags?.Primary
 			  }`
 			: '';
 	}
-
+	
 	async getLibraryItem(itemId: string, refreshCache = false) {
 		const item = await this.getLibraryItems(refreshCache).then((items) =>
 			items.find((i) => i.Id === itemId)

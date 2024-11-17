@@ -1,20 +1,20 @@
 import { derived, type Readable, writable } from 'svelte/store';
-import { settings } from './settings.store';
+import { generalSettings } from './generalSettings.store';
 import { jellyfinApi, type JellyfinItem } from '../apis/jellyfin/jellyfin-api';
 import { type EpisodeDownload, sonarrApi, type SonarrSeries } from '../apis/sonarr/sonarr-api';
 import { radarrApi, type MovieDownload } from '../apis/radarr/radarr-api';
 
 async function waitForSettings() {
 	return new Promise((resolve) => {
-		let resolved = false;
-		settings.subscribe((settings) => {
-			if (settings?.initialised && !resolved) {
-				resolved = true;
-				resolve(settings);
-			}
-		});
+	  let resolved = false;
+	  generalSettings.subscribe((settings) => {
+		if (settings?.data && !resolved) {
+		  resolved = true;
+		  resolve(settings);
+		}
+	  });
 	});
-}
+  }
 
 type AwaitableStoreValue<R, T = { data?: R }> = {
 	loading: boolean;
