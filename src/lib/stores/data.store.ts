@@ -54,6 +54,9 @@ export function _createDataFetchStore<T>(fn: () => Promise<T>) {
 	};
 }
 
+
+//---------------------------------------
+
 export const jellyfinItemsStore = _createDataFetchStore(() => jellyfinApi.getLibraryItems());
 
 export function createJellyfinItemStore(tmdbId: number | Promise<number>) {
@@ -82,6 +85,8 @@ export function createJellyfinItemStore(tmdbId: number | Promise<number>) {
 		})
 	};
 }
+
+//---------------------------------------
 
 export const sonarrSeriesStore = _createDataFetchStore(sonarrApi.getDownloads);
 export const radarrMoviesStore = _createDataFetchStore(radarrApi.getRadarrMovies);

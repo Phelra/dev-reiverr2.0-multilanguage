@@ -13,6 +13,10 @@ export type RequestDto = components['schemas']['Request'];
 export type CreateRequestDto = components['schemas']['CreateRequestDto'];
 export type UpdateRequestDto = components['schemas']['UpdateRequestDto'];
 
+export type CarouselDto = components['schemas']['CarouselDto'];
+export type CreateCarouselDto = components['schemas']['CreateCarouselDto'];
+export type UpdateCarouselDto = components['schemas']['UpdateCarouselDto'];
+
 export class ReiverrApi implements Api<paths> {
 	getClient(basePath?: string, _token?: string) {
 		const session = get(sessions).activeSession;
@@ -191,7 +195,66 @@ export class ReiverrApi implements Api<paths> {
 				console.error('Error deleting request:', error);
 				return error.message;
 		}
-};
+	};
+
+	createCarousel = (carousel: CreateCarouselDto) =>
+		this.getClient()
+			?.POST('/carousels', {
+				body: carousel
+			})
+			.then((res) => ({ carousel: res.data, error: res.error?.message }));
+
+	getAllCarousels = () =>
+		this.getClient()
+			.GET('/carousels', {})
+			.then((res) => res.data);
+
+	getCarouselById = (id: number) =>
+		this.getClient()
+			?.GET('/carousels/{id}', {
+				params: {
+					path: {
+						id
+					}
+				}
+			})
+			.then((res) => res.data as CarouselDto);
+
+	updateCarousel = (id: number, carousel: UpdateCarouselDto) =>
+		this.getClient()
+			?.PATCH('/carousels/{id}', {
+				params: {
+					path: {
+						id
+					}
+				},
+				body: carousel
+			})
+			.then((res) => ({ carousel: res.data, error: res.error?.message }));
+
+	deleteCarousel = async (id: number) => {
+		try {
+			const response = await this.getClient()?.DELETE('/carousels/{id}', {
+				params: {
+					path: {
+						id
+					}
+				}
+			});
+
+			if (response?.error) {
+				console.error('Error from API:', response.error.message);
+				return response.error.message;
+			}
+
+			return response.data || 'Carousel successfully deleted';
+
+		} catch (error) {
+			console.error('Error deleting carousel:', error);
+			return error.message;
+		}
+	};
+
 }
 
 export const reiverrApi = new ReiverrApi();

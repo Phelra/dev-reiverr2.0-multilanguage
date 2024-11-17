@@ -1,6 +1,6 @@
 import { ApiProperty, OmitType, PartialType, PickType } from '@nestjs/swagger';
 import { User } from './user.entity';
-import { Request } from '../requests/requests.entity';
+import { Request } from '../requests/request.entity';
 
 export class UserDto extends OmitType(User, [
   'password',

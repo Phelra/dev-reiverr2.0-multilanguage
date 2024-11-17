@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { Request } from './requests.entity';
+import { Request } from './request.entity';
 import { DATA_SOURCE } from '../database/database.providers';
 
 export const requestProviders = [

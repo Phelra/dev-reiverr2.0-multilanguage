@@ -12,7 +12,9 @@ import PageNotFound from '../../pages/PageNotFound.svelte';
 import ManagePage from '../../pages/ManagePage.svelte';
 import PersonPage from '../../pages/PersonPage.svelte';
 import UsersPage from '../../pages/UsersPage.svelte';
+import AvailableHomePage from '../../pages/AvailableHomePage.svelte';
 import RequestsPage from '../../pages/RequestsPage.svelte';
+import LoadMoreCard from '../../pages/LoadMoreCard.svelte';
 
 interface Page {
 	id: symbol;
@@ -248,11 +250,25 @@ const manageRoute: Route = {
 	root: true
 };
 
-const RequestsPageRoute: Route = {
+
+const availableRoute: Route = {
+	path: '/available',
+	component: AvailableHomePage,
+	root: true
+ };
+
+  const RequestsPageRoute: Route = {
 	path: '/requests',
 	component: RequestsPage,
 	root: true
 };
+
+const loadMoreRoute: Route = {
+    path: '/loadmore/:carouselName',
+    component: LoadMoreCard,
+    root: true,
+};
+
 
 const notFoundRoute: Route = {
 	path: '/404',
@@ -272,7 +288,9 @@ export const stackRouter = useStackRouter({
 		libraryRoute,
 		searchRoute,
 		manageRoute,
-		RequestsPageRoute
+		availableRoute,
+		RequestsPageRoute,
+		loadMoreRoute
 	],
 	notFound: notFoundRoute
 });

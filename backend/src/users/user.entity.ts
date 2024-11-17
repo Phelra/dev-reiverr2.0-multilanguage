@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Request } from '../requests/requests.entity';
+import { Request } from '../requests/request.entity';
 
 export class SonarrSettings {
   @ApiProperty({ required: true })

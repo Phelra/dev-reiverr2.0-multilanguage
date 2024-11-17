@@ -77,14 +77,26 @@
 		>
 			<div class="flex-1 text-center text-nowrap flex items-center justify-center relative">
 				{#if $$slots.icon}
-					<div class="mr-2">
-						<slot name="icon" />
-					</div>
+					{#if $$slots.default || $$slots['icon-after'] || iconAfter || $$slots['icon-absolute'] || iconAbsolute}
+						<div class="mr-2">
+							<slot name="icon" />
+						</div>
+					{:else}
+						<div>
+							<slot name="icon" />
+						</div>
+					{/if}
 				{/if}
 				{#if icon}
-					<div class="mr-2">
-						<svelte:component this={icon} size={19} />
-					</div>
+					{#if $$slots.default || $$slots['icon-after'] || iconAfter || $$slots['icon-absolute'] || iconAbsolute}
+						<div class="mr-2">
+							<svelte:component this={icon} size={19} />
+						</div>
+					{:else}
+						<div>
+							<svelte:component this={icon} size={19} />
+						</div>
+					{/if}
 				{/if}
 				<slot {hasFocus} />
 				{#if $$slots['icon-after']}

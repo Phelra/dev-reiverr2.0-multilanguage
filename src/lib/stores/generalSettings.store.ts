@@ -87,6 +87,7 @@ function useGeneralSettings() {
 
       if (lastActiveSession === activeSession) {
         settingsStore.set({ data: settings, loading: false, error: null });
+        console.log('Settings successfully loaded:', settings); 
       }
     } catch (error) {
       settingsStore.set({ data: null, loading: false, error: 'Failed to load settings' });
@@ -110,6 +111,7 @@ function useGeneralSettings() {
 
       if (response.data) {
         settingsStore.set({ data: response.data, loading: false, error: null });
+        console.log('Settings successfully updated:', response.data);
       }
     } catch (error) {
       console.error('Error during updateSettings API call:', error);

@@ -28,11 +28,13 @@
     import { generalSettings } from '../stores/generalSettings.store';
 	import RequestSettings from '../components/Requests/RequestSettings.svelte';
 	import { sonarrApi } from '../apis/sonarr/sonarr-api';
+	import MediaCarouselManager from '../components/Carousel/MediaCarouselManager.svelte';
 
 	enum Tabs {
 		Interface,
 		Account,
 		RequestSettings,
+		MediaCarousels,
 		About
 	}
 
@@ -64,6 +66,10 @@
 	function handleLogOut() {
 		sessions.removeSession();
 	}
+
+	function goToEditCarousel() {
+        tab.set(Tabs.MediaCarousels);
+    }
 
 	// onMount(() => {
 	// 	if (isTizen()) {
@@ -138,6 +144,20 @@
 			</span>
 		</Container>
 		<Container
+			on:enter={() => tab.set(Tabs.MediaCarousels)}
+			on:clickOrSelect={() => tab.set(Tabs.MediaCarousels)}
+			let:hasFocus
+			focusOnClick>
+			<span
+				class={classNames('cursor-pointer', {
+					'text-secondary-400': $tab !== Tabs.MediaCarousels,
+					'text-primary-500': hasFocus
+				})}
+			>
+				Carousels
+			</span>
+		</Container>
+		<Container
 			on:enter={() => tab.set(Tabs.About)}
 			on:clickOrSelect={() => tab.set(Tabs.About)}
 			let:hasFocus
@@ -183,6 +203,7 @@
 			</div>
 
 			<h2 class="text-xl font-bold text-secondary-100 py-4">Customization</h2>
+
 			<div class="flex items-center justify-between text-lg font-medium text-secondary-100 py-2">
 				<label class="mr-2">Show rating on card</label>
 				<Toggle
@@ -190,6 +211,10 @@
 					on:change={({ detail }) =>
 						localSettings.update((p) => ({ ...p, showRatingOnCard: detail }))}
 				/>
+			</div>
+			<div class="flex items-center justify-between text-lg font-medium text-secondary-100 py-2">
+				<label class="mr-2">Carousels for available page</label>
+				<Button type="primary-dark" on:clickOrSelect={goToEditCarousel}>Edit</Button>
 			</div>
 		</Tab>
 
@@ -384,6 +409,14 @@
 				<RequestSettings />
 			{:else}
 				<p class="text-red-500">You must be an administrator to manage these settings.</p>
+			{/if}
+		</Tab>
+
+		<Tab {...tab} tab={Tabs.MediaCarousels} class="w-full">
+			{#if $user?.isAdmin}
+				<MediaCarouselManager />
+			{:else}
+				<p class="text-red-500">You must be an administrator to manage media carousels.</p>
 			{/if}
 		</Tab>
 

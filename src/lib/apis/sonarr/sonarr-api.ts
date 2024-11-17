@@ -384,7 +384,6 @@ export class SonarrApi implements ApiAsync<paths> {
 					})
 		);
 	
-	
 	monitorSeason = (seriesId: number, seasonNumber: number, monitored: boolean): Promise<void> =>
 		this.getClient().then((client) =>
 			client

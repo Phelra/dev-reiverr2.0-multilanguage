@@ -13,9 +13,9 @@
 		'aspect-[2/3]': orientation === 'portrait',
 		'w-44': size === 'md' && orientation === 'portrait',
 		'h-44': size === 'md' && orientation === 'landscape',
-		'w-60': size === 'lg' && orientation === 'portrait',
+		'w-60 h-96': size === 'lg' && orientation === 'portrait',
+		'w-[100px] h-[150px]': size === 'rq' && orientation === 'portrait',
 		'h-60': size === 'lg' && orientation === 'landscape',
-		'w-[100px] h-[150px]': size === 'rq',
 		'w-full': size === 'dynamic'
 	})}
 	style={'animation-delay: ' + ((index * 100) % 2000) + 'ms;'}

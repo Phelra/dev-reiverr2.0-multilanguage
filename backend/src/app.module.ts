@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { RequestsModule } from './requests/requests.module';
 import { SettingsModule } from './settings/settings.module';
 import { AuthModule } from './auth/auth.module';
+import { CarouselModule } from './carousels/carousel.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
@@ -13,6 +14,7 @@ import { join } from 'path';
   imports: [
     DatabaseModule,
     RequestsModule,
+    CarouselModule,
     SettingsModule,
     UsersModule,
     AuthModule,

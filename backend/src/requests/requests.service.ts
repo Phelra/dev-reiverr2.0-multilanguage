@@ -1,7 +1,7 @@
 import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { Repository, Between } from 'typeorm';
-import { Request } from './requests.entity';
-import { CreateRequestDto, UpdateRequestDto } from './requests.dto';
+import { Request } from './request.entity';
+import { CreateRequestDto, UpdateRequestDto } from './request.dto';
 import { User } from '../users/user.entity';
 
 @Injectable()

@@ -12,8 +12,13 @@
 	import { navigate } from '../components/StackRouter/StackRouter';
 	import DetachedPage from '../components/DetachedPage/DetachedPage.svelte';
 
-	const continueWatching = jellyfinApi.getContinueWatching('movie');
-	const recentlyAdded = jellyfinApi.getRecentlyAdded('movie');
+	const continueWatching = jellyfinApi.getContinueWatching('movie').then(items => {
+		return items.filter(item => item.Type === 'Movie');
+	});
+
+	const recentlyAdded = jellyfinApi.getRecentlyAdded('movie').then(items => {
+		return items.filter(item => item.Type === 'Movie');
+	});
 
 	const popularMovies = tmdbApi.getPopularMovies();
 
@@ -167,51 +172,5 @@
 				</Carousel>
 			{/if}
 		{/await}
-
-		{#await Promise.all( [mostRecommendedGenres, recommendedMovies] ) then [genres, { genreIdToMovie }]}
-			{@const genre = genres[3] || -1}
-			{@const items = genreIdToMovie[genre] || []}
-			{#if items.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_MOVIE_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each items as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		<!-- NETWORKS -->
-
-		{#await Promise.all( [mostRecommendedGenres, recommendedMovies] ) then [genres, { genreIdToMovie }]}
-			{@const genre = genres[4] || -1}
-			{@const items = genreIdToMovie[genre] || []}
-			{#if items.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_MOVIE_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each items as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		{#await Promise.all( [mostRecommendedGenres, recommendedMovies] ) then [genres, { genreIdToMovie }]}
-			{@const genre = genres[5] || -1}
-			{@const items = genreIdToMovie[genre] || []}
-			{#if items.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_MOVIE_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each items as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		<!-- GENRES -->
-		<!-- TOP RATED -->
-		<!-- TRENDING PEOPLE -->
-		<!-- Watchlist -->
 	</div>
 </DetachedPage>

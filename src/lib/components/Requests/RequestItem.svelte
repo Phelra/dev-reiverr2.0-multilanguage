@@ -8,11 +8,11 @@
   import { formatTimeAgo } from '../../utils';
   import { scrollIntoView } from '../../selectable';
   import { handleMovieDownload } from '../MediaManagerAuto/AutoDownloadManagerMovie';
+  import { handleSeriesDownload } from '../MediaManagerAuto/AutoDownloadManagerSerie';
   import { getOrAddSeriesToSonarr } from '../MediaManagerAuto/addSerieToSonarrAutomatically';
   import { getOrAddMovieToRadarr } from '../MediaManagerAuto/addMovieToRadarrAutomatically';
   import { requestsStore } from '../../stores/requests.store';
-  import { searchSeriesMedia } from '../MediaManagerAuto/searchMedia';
-  import CardPlaceholder from '../Card/CardPlaceholder.svelte';
+
   import type { RequestDto } from '../../apis/reiverr/reiverr-api';
 
   export let request: RequestDto;
@@ -62,38 +62,21 @@
             throw new Error('Failed to add or retrieve the movie from Radarr');
           }
 
-        }else if (request.media_type === 1 && request.season !== null) {
+        } else if (request.media_type === 1 && request.season !== null) {
           setLoadingMessage('(0/2) Searching for the series in the library');
-          
-          try {
-            const sonarrItem = await getOrAddSeriesToSonarr(
-              request.media_id,
-              mediaDetails.title || 'Unknown',
-              () => console.log(`Series ${mediaDetails.title} successfully added to Sonarr`)
-            );
+          const sonarrItem = await getOrAddSeriesToSonarr(
+            request.media_id,
+            mediaDetails.title || 'Unknown',
+            () => console.log(`Series ${mediaDetails.title} successfully added to Sonarr`)
+          );
 
-            if (sonarrItem) {
-              // Appel simplifié à `searchSeriesMedia`
-              const success = await searchSeriesMedia(
-                sonarrItem,
-                request.season,
-                false,              // monitoring est mis sur false pour ce cas
-                request.episode,     // pas d'épisode spécifique
-                false                // affichage de la modal
-              );
-
-              if (!success) {
-                handleError('Failed to initiate the download for the series');
-                throw new Error('Failed to initiate the download for the series');
-              }
-            } else {
-              handleError('Failed to add or retrieve the series from Sonarr');
-              throw new Error('Failed to add or retrieve the series from Sonarr');
-            }
-          } catch (error) {
-            handleError('An error occurred during the series search');
-            console.error('Series search error:', error);
+          if (sonarrItem) {
+            await handleSeriesDownload(sonarrItem.id, request.season, setLoadingMessage, handleError);
+          } else {
+            handleError('Failed to add or retrieve the series from Sonarr');
+            throw new Error('Failed to add or retrieve the series from Sonarr');
           }
+
         } else {
           handleError('Invalid media type or missing season for the series');
           throw new Error('Invalid media type or missing season for the series');
@@ -131,21 +114,20 @@
 
 <Container class="bg-primary-800 rounded-lg mb-4 p-4 flex flex-col md:flex-row items-center md:items-center">
 
-  <div class="flex-shrink-0 mb-4 md:mb-0 md:mr-6" style="width: 100px; height: 150px;">
-  {#if mediaDetails.posterUrl}
-    <img
-      on:click={viewMediaPage}
-      src={mediaDetails.posterUrl}
-      alt="Media poster"
-      class="object-cover rounded-lg shadow-lg"
-      width="100"
-      height="150"
-    />
-  {:else}
-  <CardPlaceholder size="rq" />
-  {/if}
-</div>
-
+  <div class="flex-shrink-0 mb-4 md:mb-0 md:mr-6">
+    {#if mediaDetails.posterUrl}
+      <img
+        on:click={viewMediaPage}
+        src={mediaDetails.posterUrl}
+        alt="Media poster"
+        class="object-cover rounded-lg shadow-lg"
+        width="100"
+        height="150"
+      />
+    {:else}
+      <div class="loading-placeholder poster-placeholder"></div>
+    {/if}
+  </div>
 
   <div class="mb-4 md:mb-0" style="flex: 3; display: flex; flex-direction: column; justify-content: center;">
     {#if mediaDetails.releaseYear}

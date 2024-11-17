@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards, Query } from '@nestjs/common';
 import { RequestsService } from './requests.service';
-import { CreateRequestDto, UpdateRequestDto } from './requests.dto';
+import { CreateRequestDto, UpdateRequestDto } from './request.dto';
 import { AuthGuard, GetUser } from '../auth/auth.guard';
 import { User } from '../users/user.entity';
 

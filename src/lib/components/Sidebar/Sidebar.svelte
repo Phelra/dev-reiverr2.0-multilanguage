@@ -6,9 +6,9 @@
 		Gear,
 		Laptop,
 		MagnifyingGlass,
+		CheckCircled,
 		Person,
-		Timer
-	} from 'radix-icons-svelte';
+		Timer	} from 'radix-icons-svelte';
 	import classNames from 'classnames';
 	import { get, type Readable, writable, type Writable } from 'svelte/store';
 	import Container from '../../../Container.svelte';
@@ -21,6 +21,7 @@
 
 	enum Tabs {
 		Users,
+		Available,
 		Series,
 		Movies,
 		Library,
@@ -63,6 +64,7 @@
 				[Tabs.Library]: '/library',
 				[Tabs.Search]: '/search',
 				[Tabs.Manage]: '/manage',
+				[Tabs.Available]: '/available',
 				[Tabs.RequestsPage]: '/requests'
 			}[index] || '/';
 		navigate(path);
@@ -78,6 +80,7 @@
 					{
 						'/users': Tabs.Users,
 						'/': Tabs.Series,
+						'/available': Tabs.Available,
 						'/series': Tabs.Series,
 						'/movies': Tabs.Movies,
 						'/library': Tabs.Library,
@@ -165,6 +168,42 @@
 </Container>
 
 	<div class={'flex-1 flex flex-col justify-center self-stretch'}>
+		
+		<Container
+		class="w-full h-12 cursor-pointer"
+		on:clickOrSelect={selectIndex(Tabs.Available)}
+		let:hasFocus
+	>
+		<div
+			class={classNames('w-full h-full relative flex items-center justify-center', {
+				'text-primary-500': hasFocus || (!$isNavBarOpen && selectedIndex === Tabs.Available),
+				'text-stone-300 hover:text-primary-500':
+					!hasFocus && !(!$isNavBarOpen && selectedIndex === Tabs.Available)
+			})}
+		>
+			<div class="absolute inset-y-0 left-2 flex items-center justify-center">
+				<DotFilled
+					class={classNames('text-primary-500', { 'opacity-0': activeIndex !== Tabs.Available })}
+					size={19}
+				/>
+			</div>
+			<CheckCircled class="w-8 h-8" />
+			<span
+				class={classNames(
+					'text-xl font-medium transition-opacity flex items-center absolute inset-y-0 left-20',
+					{
+						'opacity-0 pointer-events-none': $isNavBarOpen === false,
+						'group-hover:opacity-100 group-hover:pointer-events-auto': true
+					}
+				)}
+			>
+				Available
+			</span>
+		</div>
+	</Container>
+		
+		
+		
 		<Container
 			class="w-full h-12 cursor-pointer"
 			on:clickOrSelect={selectIndex(Tabs.Series)}

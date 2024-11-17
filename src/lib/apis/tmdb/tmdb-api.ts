@@ -522,12 +522,7 @@ export class TmdbApi implements Api<paths> {
 
 	getConnectAccountLink = () =>
 		this.getClient4()
-			?.POST('/4/auth/request_token', {
-				body: {
-					// @ts-ignore
-					redirect_to: 'https://www.themoviedb.org/'
-				}
-			})
+			?.POST('/4/auth/request_token', {})
 			.then((res) => res.data);
 
 	getAccountAccessToken = (requestToken: string) =>
@@ -728,6 +723,7 @@ export const getTmdbMoviePosterLandscape = async (tmdbId: number) =>
 		getTmdbMovie(tmdbId)
 			.then((m) => m?.images?.posters?.find((poster) => poster.iso_639_1 === 'en')?.file_path)
 	);
+
 
 /** Discover */
 
