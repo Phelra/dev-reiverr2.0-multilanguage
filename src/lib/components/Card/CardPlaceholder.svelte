@@ -3,7 +3,7 @@
 	import { fade } from 'svelte/transition';
 
 	export let index = 0;
-	export let size: 'dynamic' | 'md' | 'lg' = 'md';
+	export let size: 'dynamic' | 'md' | 'rq' | 'lg' = 'md';
 	export let orientation: 'portrait' | 'landscape' = 'landscape';
 </script>
 
@@ -15,6 +15,7 @@
 		'h-44': size === 'md' && orientation === 'landscape',
 		'w-60': size === 'lg' && orientation === 'portrait',
 		'h-60': size === 'lg' && orientation === 'landscape',
+		'w-[100px] h-[150px]': size === 'rq',
 		'w-full': size === 'dynamic'
 	})}
 	style={'animation-delay: ' + ((index * 100) % 2000) + 'ms;'}

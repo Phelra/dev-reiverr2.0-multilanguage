@@ -6,7 +6,7 @@ import type { components, paths } from './radarr.generated';
 import { getTmdbMovie } from '../tmdb/tmdb-api';
 import { log } from '../../utils';
 import type { Api } from '../api.interface';
-import { user } from '../../stores/user.store';
+import { generalSettings } from '../../stores/generalSettings.store';
 
 export const movieAvailabilities = [
 	// 'tba',
@@ -39,7 +39,7 @@ export interface RadarrMovieOptions {
 
 export class RadarrApi implements Api<paths> {
 	getClient() {
-		const radarrSettings = get(user)?.settings.radarr;
+		const radarrSettings = get(generalSettings)?.data?.integrations?.radarr;
 		const baseUrl = radarrSettings?.baseUrl;
 		const apiKey = radarrSettings?.apiKey;
 
@@ -52,11 +52,11 @@ export class RadarrApi implements Api<paths> {
 	}
 
 	getBaseUrl() {
-		return get(user)?.settings?.radarr.baseUrl || '';
+		return get(generalSettings)?.data?.integrations?.radarr?.baseUrl || '';
 	}
 
 	getSettings() {
-		return get(user)?.settings.radarr;
+		return get(generalSettings)?.data?.integrations?.radarr;
 	}
 
 	getMovieByTmdbId = (tmdbId: number): Promise<RadarrMovie | undefined> =>
@@ -115,6 +115,35 @@ export class RadarrApi implements Api<paths> {
 		);
 	};
 
+	updateMovieInRadarr = async (
+		radarrItem: any,
+		_options: {
+		  qualityProfileId?: number;
+		  minimumAvailability?: MovieAvailability;
+		  monitored?: boolean;
+		} = {}
+	  ) => {
+		try {
+		  const options: RadarrMovieOptions = {
+			...radarrItem,
+			qualityProfileId: _options.qualityProfileId || radarrItem.qualityProfileId || 0,
+			monitored: _options.monitored ?? radarrItem.monitored,
+			minimumAvailability: _options.minimumAvailability || radarrItem.minimumAvailability || 'released',
+		  };
+	  
+		  return this.getClient()
+			?.PUT('/api/v3/movie/{id}', {
+			  params: { path: { id: radarrItem.id } },
+			  query: { moveFiles: false },
+			  body: options
+			})
+			.then((r) => r.data) || Promise.resolve(undefined);
+		} catch (error) {
+		  throw new Error('Failed to update movie in Radarr');
+		}
+	  };
+	  
+			
 	cancelDownloadRadarrMovie = async (downloadId: number) => {
 		const deleteResponse = await this.getClient()
 			?.DELETE('/api/v3/queue/{id}', {
@@ -277,10 +306,10 @@ export class RadarrApi implements Api<paths> {
 	) =>
 		axios
 			.get<components['schemas']['QualityProfileResource'][]>(
-				(baseUrl || get(user)?.settings.radarr.baseUrl) + '/api/v3/qualityprofile',
+				(baseUrl || get(generalSettings)?.data?.integrations?.radarr?.baseUrl) + '/api/v3/qualityprofile',
 				{
 					headers: {
-						'X-Api-Key': apiKey || get(user)?.settings.radarr.apiKey
+						'X-Api-Key': apiKey || get(generalSettings)?.data?.integrations?.radarr?.apiKey
 					}
 				}
 			)
@@ -296,6 +325,9 @@ export class RadarrApi implements Api<paths> {
 		return url;
 	}
 }
+
+
+
 
 export const radarrApi = new RadarrApi();
 export const radarrApiClient = radarrApi.getClient;

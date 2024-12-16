@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TextField from '../TextField.svelte';
 	import { user } from '../../stores/user.store';
+	import { generalSettings } from '../../stores/generalSettings.store';
 	import { createEventDispatcher } from 'svelte';
 	import SelectField from '../SelectField.svelte';
 	import { jellyfinApi, type JellyfinUser } from '../../apis/jellyfin/jellyfin-api';
@@ -14,12 +15,13 @@
 		};
 	}>();
 
-	let baseUrl = get(user)?.settings.jellyfin.baseUrl || '';
-	let apiKey = get(user)?.settings.jellyfin.apiKey || '';
+	let baseUrl = get(generalSettings)?.data?.integrations?.jellyfin?.baseUrl || '';
+	let apiKey = get(generalSettings)?.data?.integrations?.jellyfin?.apiKey || '';
 	export let jellyfinUser: JellyfinUser | undefined = undefined;
-	const originalBaseUrl = derived(user, (user) => user?.settings.jellyfin.baseUrl || '');
-	const originalApiKey = derived(user, (user) => user?.settings.jellyfin.apiKey || '');
+	const originalBaseUrl = derived(generalSettings, (settings) => settings?.data?.integrations?.jellyfin?.baseUrl || '');
+	const originalApiKey = derived(generalSettings, (settings) => settings?.data?.integrations?.jellyfin?.apiKey || '');
 	const originalUserId = derived(user, (user) => user?.settings.jellyfin.userId || undefined);
+	const isAdmin = derived(user, (user) => user?.isAdmin || false);
 
 	let timeout: ReturnType<typeof setTimeout>;
 	export let jellyfinUsers: Promise<JellyfinUser[]> | undefined = undefined;
@@ -81,14 +83,22 @@
 	async function handleSave() {
 		if (!stale) return;
 
+		await generalSettings.updateSettings((prev) => ({
+			...prev,
+			integrations: {
+				...prev.integrations,
+				jellyfin: {
+					baseUrl,
+					apiKey				}
+			}
+		}));
+
 		return user.updateUser((prev) => ({
 			...prev,
 			settings: {
 				...prev.settings,
 				jellyfin: {
 					...prev.settings.jellyfin,
-					baseUrl,
-					apiKey,
 					userId: jellyfinUser?.Id || ''
 				}
 			}
@@ -102,22 +112,29 @@
 		$originalUserId === jellyfinUser?.Id;
 </script>
 
-<div class="space-y-4 mb-4">
-	<TextField
-		bind:value={baseUrl}
-		isValid={jellyfinUsers?.then((u) => !!u?.length)}
-		on:change={handleChange}
-	>
-		Base Url
-	</TextField>
-	<TextField
-		bind:value={apiKey}
-		isValid={jellyfinUsers?.then((u) => !!u?.length)}
-		on:change={handleChange}
-	>
-		API Key
-	</TextField>
-</div>
+{#if $isAdmin}
+	<div class="space-y-4 mb-4">
+		<TextField
+			bind:value={baseUrl}
+			isValid={jellyfinUsers?.then((u) => !!u?.length)}
+			on:change={handleChange}
+		>
+			Base Url
+		</TextField>
+		<TextField
+			bind:value={apiKey}
+			isValid={jellyfinUsers?.then((u) => !!u?.length)}
+			on:change={handleChange}
+		>
+			API Key
+		</TextField>
+	</div>
+{/if}
+{#if !$isAdmin && (!baseUrl || !apiKey)}
+	<div class="text-red-500 mb-4">
+		The administrator has not configured this element, you cannot choose your user.
+	</div>
+{/if}
 
 {#await jellyfinUsers then users}
 	{#if users?.length}

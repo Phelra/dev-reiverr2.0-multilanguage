@@ -5,6 +5,27 @@
 
 
 export interface paths {
+  "/requests": {
+    get: operations["RequestsController_findAll"];
+    post: operations["RequestsController_create"];
+  };
+  "/requests/{user_id}": {
+    get: operations["RequestsController_findByUser"];
+  };
+  "/requests/media/{media_id}": {
+    get: operations["RequestsController_findByMediaId"];
+  };
+  "/requests/count/{user_id}": {
+    get: operations["RequestsController_countRequestsInPeriodForUser"];
+  };
+  "/requests/{id}": {
+    delete: operations["RequestsController_remove"];
+    patch: operations["RequestsController_update"];
+  };
+  "/settings": {
+    get: operations["SettingsController_getSettings"];
+    patch: operations["SettingsController_updateSettings"];
+  };
   "/users": {
     get: operations["UsersController_findAll"];
     post: operations["UsersController_create"];
@@ -26,23 +47,25 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    CreateRequestDto: {
+      user_id: string;
+      media_id: number;
+      media_type: number;
+      season: number;
+      status: string;
+    };
+    UpdateRequestDto: {
+      media_type?: number;
+      season?: number;
+      status?: string;
+    };
+    UpdateSettingsDto: Record<string, never>;
     SonarrSettings: {
       apiKey: string;
       baseUrl: string;
       qualityProfileId: number;
       rootFolderPath: string;
       languageProfileId: number;
-    };
-    RadarrSettings: {
-      apiKey: string;
-      baseUrl: string;
-      qualityProfileId: number;
-      rootFolderPath: string;
-    };
-    JellyfinSettings: {
-      apiKey: string;
-      baseUrl: string;
-      userId: string;
     };
     TmdbSettings: {
       sessionId: string;
@@ -52,10 +75,32 @@ export interface components {
       autoplayTrailers: boolean;
       language: string;
       animationDuration: number;
-      sonarr: components["schemas"]["SonarrSettings"];
-      radarr: components["schemas"]["RadarrSettings"];
-      jellyfin: components["schemas"]["JellyfinSettings"];
+      jellyfin: components["schemas"]["SonarrSettings"];
       tmdb: components["schemas"]["TmdbSettings"];
+    };
+    Buffer: Record<string, never>;
+    User: {
+      id: string;
+      name: string;
+      password: string;
+      profilePicture?: components["schemas"]["Buffer"];
+      isAdmin: boolean;
+      onboardingDone?: boolean;
+      settings: components["schemas"]["Settings"];
+    };
+    Request: {
+      id: number;
+      user_id: string;
+      media_id: number;
+      media_type: number;
+      season: number;
+      episode: number;
+      status: string;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      user: components["schemas"]["User"];
     };
     UserDto: {
       id: string;
@@ -64,6 +109,7 @@ export interface components {
       onboardingDone?: boolean;
       settings: components["schemas"]["Settings"];
       profilePicture: string;
+      requests?: components["schemas"]["Request"][];
     };
     CreateUserDto: {
       name: string;
@@ -102,6 +148,112 @@ export type external = Record<string, never>;
 
 export interface operations {
 
+  RequestsController_findAll: {
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_create: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateRequestDto"];
+      };
+    };
+    responses: {
+      201: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_findByUser: {
+    parameters: {
+      path: {
+        user_id: string;
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_findByMediaId: {
+    parameters: {
+      path: {
+        media_id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_countRequestsInPeriodForUser: {
+    parameters: {
+      query: {
+        days: number;
+      };
+      path: {
+        user_id: string;
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_remove: {
+    parameters: {
+      path: {
+        id: string;
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  RequestsController_update: {
+    parameters: {
+      path: {
+        id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateRequestDto"];
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  SettingsController_getSettings: {
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
+  SettingsController_updateSettings: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateSettingsDto"];
+      };
+    };
+    responses: {
+      200: {
+        content: never;
+      };
+    };
+  };
   UsersController_findAll: {
     responses: {
       /** @description All users found */

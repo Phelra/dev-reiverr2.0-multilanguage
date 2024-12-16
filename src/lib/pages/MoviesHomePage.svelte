@@ -43,21 +43,32 @@
 	}
 
 	function getDigitalReleases() {
-		return TmdbApi.getClient()
-			.GET('/3/discover/movie', {
-				params: {
-					query: {
-						with_release_type: 4,
-						sort_by: 'popularity.desc',
-						'release_date.lte': formatDateToYearMonthDay(new Date())
-						// language: $settings.language,
-						// with_original_language: parseIncludedLanguages($settings.discover.includedLanguages)
-						// region: $settings.discover.region
-					}
+	console.log("[getDigitalReleases] Initiating request to fetch digital releases.");
+
+	return TmdbApi.getClient()
+		.GET('/3/discover/movie', {
+			params: {
+				query: {
+					with_release_type: 4,
+					sort_by: 'popularity.desc',
+					'release_date.lte': formatDateToYearMonthDay(new Date())
+					// language: $settings.language,
+					// with_original_language: parseIncludedLanguages($settings.discover.includedLanguages)
+					// region: $settings.discover.region
 				}
-			})
-			.then((res) => res.data?.results || []);
-	}
+			}
+		})
+		.then((res) => {
+			const results = res.data?.results || [];
+			console.log(`[getDigitalReleases] Received data:`, results);
+			return results;
+		})
+		.catch((error) => {
+			console.error("[getDigitalReleases] Error fetching digital releases:", error);
+			return [];
+		});
+}
+
 </script>
 
 <DetachedPage class="flex flex-col relative">

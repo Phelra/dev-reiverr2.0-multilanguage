@@ -35,9 +35,11 @@ export const localSettings = createLocalStorageStore<{
 	useCssTransitions: boolean;
 	checkForUpdates: boolean;
 	skippedVersion: string;
+	showRatingOnCard: boolean;
 }>('settings', {
 	animateScrolling: true,
 	useCssTransitions: true,
 	checkForUpdates: true,
-	skippedVersion: ''
+	skippedVersion: '',
+	showRatingOnCard: false
 });

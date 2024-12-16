@@ -10,7 +10,7 @@
 	import { jellyfinApi } from '../apis/jellyfin/jellyfin-api';
 	import { playerState } from '../components/VideoPlayer/VideoPlayer';
 	import { formatSize, retry, timeout } from '../utils';
-	import { createModal } from '../components/Modal/modal.store';
+	import { createModal, modalStack } from '../components/Modal/modal.store';
 	import ButtonGhost from '../components/Ghosts/ButtonGhost.svelte';
 	import {
 		type EpisodeFileResource,
@@ -22,10 +22,22 @@
 	import SonarrMediaManagerModal from '../components/MediaManagerModal/SonarrMediaManagerModal.svelte';
 	import ConfirmDialog from '../components/Dialog/ConfirmDialog.svelte';
 	import { tick } from 'svelte';
+	import { createSerieRequest, createSerieRequestApprouved } from '../components/Requests/requestCreation';
+	import SpinnerModal from '../components/SpinnerModal.svelte';
+	import { getOrAddSeriesToSonarr } from '../components/MediaManagerAuto/addSerieToSonarrAutomatically';
+	import { writable, get } from 'svelte/store';
+	import { generalSettings } from '../stores/generalSettings.store';
+	import { user } from '../stores/user.store';
+	import { reiverrApi } from '../apis/reiverr/reiverr-api'; 
+
 
 	export let id: string; // Series ID
 	export let season: string;
 	export let episode: string;
+	let requestExists = false;
+	let pendingRequest = false;
+	let loadingMessage = writable('');
+	const currentUser = get(user);
 
 	let isWatched = false;
 
@@ -33,6 +45,10 @@
 	let sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
 	$: sonarrEpisode = getSonarrEpisode(sonarrItem);
 	let sonarrFiles = getFiles(sonarrItem, sonarrEpisode);
+
+	function setLoadingMessage(message: string) {
+	loadingMessage.set(message);
+	}
 
 	const jellyfinSeries = jellyfinApi.getLibraryItemFromTmdbId(id);
 	let jellyfinEpisode = jellyfinSeries.then((series) =>
@@ -66,36 +82,129 @@
 		});
 	}
 
-	async function handleAddedToSonarr() {
-		sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
-		return retry(() => getSonarrEpisode(sonarrItem)).then((sonarrEpisode) => {
-			sonarrEpisode &&
-				createModal(SonarrMediaManagerModal, {
-					sonarrItem: sonarrEpisode,
-					onGrabRelease: () => {}
-				});
-		});
-	}
-
 	async function handleRequestEpisode() {
-		return Promise.all([sonarrEpisode, tmdbEpisode]).then(([sonarrEpisode, tmdbEpisode]) => {
-			if (sonarrEpisode) {
-				createModal(SonarrMediaManagerModal, {
-					sonarrItem: sonarrEpisode,
-					onGrabRelease: () => {} // TODO
-				});
-			} else if (tmdbEpisode) {
-				createModal(MMAddToSonarrDialog, {
-					tmdbId: Number(id),
-					backdropUri: tmdbEpisode.still_path || '',
-					title: tmdbEpisode.name || '',
-					onComplete: handleAddedToSonarr
-				});
-			} else {
-				console.error('No series found');
-			}
-		});
-	}
+  try {
+    const tmdbSeries = await tmdbApi.getTmdbSeries(Number(id));
+
+    const sonarrItem = await getOrAddSeriesToSonarr(
+      tmdbSeries.id,
+      tmdbSeries.name,
+      () => console.log('Series added successfully.')
+    );
+
+    if (!sonarrItem) {
+      console.error('Failed to process series in Sonarr.');
+      return;
+    }
+
+    const sonarrEpisode = await getSonarrEpisode(Promise.resolve(sonarrItem));
+
+    await checkQuotaAndCreateRequest(sonarrItem, Number(season), sonarrEpisode?.id);
+  } catch (error) {
+    console.error('Error handling request for episode:', error);
+  }
+}
+
+async function checkQuotaAndCreateRequest(sonarrItem: SonarrSeries, season: number, episodeId?: number) {
+  const userId = currentUser?.id;
+  const settings = get(generalSettings);
+  const days = settings.data?.requests?.delayInDays ?? 30;
+  const userRequestCount = await reiverrApi.countRequestsInPeriodForUser(userId, days);
+  const maxRequests = settings.data?.requests?.defaultLimitTV ?? 3;
+
+  if (currentUser?.isAdmin || userRequestCount < maxRequests) {
+    const remainingRequests = maxRequests - userRequestCount;
+    createApprovedRequestDialog(remainingRequests, days, maxRequests, sonarrItem, season, episodeId);
+  } else {
+    createPendingRequestDialog(season, Number(episode));
+  }
+}
+
+function createApprovedRequestDialog(
+  remainingRequests: number,
+  days: number,
+  maxRequests: number,
+  sonarrItem: SonarrSeries,
+  season: number,
+  episodeId?: number
+) {
+  createModal(ConfirmDialog, {
+    header: 'Confirm Automatic Download',
+    body: `You have ${remainingRequests}/${maxRequests} requests remaining that will be automatically approved. Requests reset every ${days} days. After reaching this limit, further requests will require admin approval.`,
+    confirm: async () => {
+      await automaticDownloadEpisode(sonarrItem, season, episodeId);
+    }
+  });
+}
+
+async function automaticDownloadEpisode(sonarrItem: SonarrSeries, season: number, episodeId?: number) {
+  createModal(SpinnerModal, {
+    title: 'Processing Episode Download',
+    progressMessage: loadingMessage
+  });
+  try {
+    if (episodeId) {
+      await sonarrApi.monitorEpisode(episodeId);
+      await sonarrApi.searchEpisode(episodeId);
+      console.log(`Search initiated for episode ${episodeId} of series ${sonarrItem.id}, season ${season}.`);
+    } else {
+      console.error('Episode ID is missing');
+      return;
+    }
+
+    await createSerieRequestApprouved(Number(id), currentUser, season, Number(episode));
+    requestExists = true;
+    pendingRequest = false;
+
+    loadingMessage.set('Process completed');
+    setTimeout(() => modalStack.closeTopmost(), 1000);
+  } catch (error) {
+    handleError(error.message || 'Failed to download the episode.');
+    modalStack.closeTopmost();
+    createErrorDialog(error.message, () => automaticDownloadEpisode(sonarrItem, season, episodeId));
+  }
+}
+
+function createPendingRequestDialog(season: number, episode: number) {
+  createModal(ConfirmDialog, {
+    header: 'Confirm Request',
+    body: `Do you want to request episode ${episode} of season ${season}? An administrator will have to approve it before it appears in the library.`,
+    confirm: async () => {
+      try {
+        await createSerieRequest(Number(id), currentUser, season, episode);
+        requestExists = true;
+        pendingRequest = true;
+      } catch (error) {
+        console.error('Error confirming request creation:', error);
+      }
+    }
+  });
+}
+
+
+function createErrorDialog(error: string, retryCallback: () => void) {
+  const errorMessage = `An error occurred while downloading the episode: ${error} Do you want to retry downloading the episode?`;
+  createModal(ConfirmDialog, {
+    header: 'Download Error',
+    body: errorMessage,
+    confirm: () => {
+      modalStack.closeTopmost();
+      retryCallback();
+    },
+    cancel: () => {
+      modalStack.closeTopmost();
+    },
+    confirmButtonText: 'Retry',
+    cancelButtonText: 'Cancel'
+  });
+}
+
+function handleError(message: string) {
+  console.error(message);
+  loadingMessage.set('Error occurred');
+}
+
+
 
 	function createConfirmDeleteFiles(files: EpisodeFileResource[]) {
 		createModal(ConfirmDialog, {
