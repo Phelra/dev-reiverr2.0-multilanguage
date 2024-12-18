@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Container from '../../Container.svelte';
 	import Button from '../components/Button.svelte';
+	import TextField from '../components/TextField.svelte';
 	import Toggle from '../components/Toggle.svelte';
 	import { localSettings } from '../stores/localstorage.store';
 	import classNames from 'classnames';
@@ -23,10 +24,15 @@
 	import { scrollIntoView } from '../selectable';
 	import { reiverrApi } from '../apis/reiverr/reiverr-api';
 	import TmdbIntegration from '../components/Integrations/TmdbIntegration.svelte';
+	import TmdbAdminIntegration from '../components/Integrations/TmdbAdminIntegration.svelte';
+    import { generalSettings } from '../stores/generalSettings.store';
+	import RequestSettings from '../components/Requests/RequestSettings.svelte';
+	import { sonarrApi } from '../apis/sonarr/sonarr-api';
 
 	enum Tabs {
 		Interface,
 		Account,
+		RequestSettings,
 		About
 	}
 
@@ -37,10 +43,23 @@
 	let tizenMediaKey = '';
 	$: tmdbAccount = $user?.settings.tmdb.userId ? tmdbApi.getAccountDetails() : undefined;
 	let users = getUsers();
+	const adminTmdbConfigured = $generalSettings?.data?.integrations?.tmdb?.sessionId?.length ?? 0 > 0;
 
 	function getUsers() {
 		return $user?.isAdmin ? reiverrApi.getUsers() : undefined;
 	}
+
+	const fetchSettings = async () => {
+	const response = await reiverrApi.getSettings();
+	if (response.settings) {
+		console.log('Current Settings:', response.settings);
+	} else {
+		console.error('Error fetching settings:', response.error);
+	}
+	};
+
+	fetchSettings();
+
 
 	function handleLogOut() {
 		sessions.removeSession();
@@ -105,6 +124,20 @@
 			</span>
 		</Container>
 		<Container
+			on:enter={() => tab.set(Tabs.RequestSettings)}
+			on:clickOrSelect={() => tab.set(Tabs.RequestSettings)}
+			let:hasFocus
+			focusOnClick>
+			<span
+				class={classNames('cursor-pointer', {
+					'text-secondary-400': $tab !== Tabs.RequestSettings,
+					'text-primary-500': hasFocus
+				})}
+			>
+				Request
+			</span>
+		</Container>
+		<Container
 			on:enter={() => tab.set(Tabs.About)}
 			on:clickOrSelect={() => tab.set(Tabs.About)}
 			let:hasFocus
@@ -123,6 +156,7 @@
 
 	<Container class="flex-1 grid w-full overflow-y-auto scrollbar-hide relative pb-16 px-32">
 		<Tab {...tab} tab={Tabs.Interface} class="w-full">
+			<h2 class="text-xl font-bold text-secondary-100 py-4">General Settings</h2>
 			<div class="flex items-center justify-between text-lg font-medium text-secondary-100 py-2">
 				<label class="mr-2">Animate scrolling</label>
 				<Toggle
@@ -145,6 +179,16 @@
 					checked={$localSettings.checkForUpdates}
 					on:change={({ detail }) =>
 						localSettings.update((p) => ({ ...p, checkForUpdates: detail }))}
+				/>
+			</div>
+
+			<h2 class="text-xl font-bold text-secondary-100 py-4">Customization</h2>
+			<div class="flex items-center justify-between text-lg font-medium text-secondary-100 py-2">
+				<label class="mr-2">Show rating on card</label>
+				<Toggle
+					checked={$localSettings.showRatingOnCard}
+					on:change={({ detail }) =>
+						localSettings.update((p) => ({ ...p, showRatingOnCard: detail }))}
 				/>
 			</div>
 		</Tab>
@@ -218,47 +262,70 @@
 			<div>
 				<h1 class="font-semibold text-2xl text-secondary-100 mb-8">Integrations</h1>
 				<Container direction="horizontal" class="gap-16 grid grid-cols-2">
-					<Container class="flex flex-col space-y-16">
-						<Container
-							class="bg-primary-800 rounded-xl p-8"
-							on:enter={scrollIntoView({ vertical: 64 })}
-						>
-							<h1 class="mb-4 header1">Sonarr</h1>
-							<SonarrIntegration let:stale let:handleSave>
-								<Button disabled={!stale} type="primary-dark" action={handleSave}>Save</Button>
-							</SonarrIntegration>
-						</Container>
+						{#if $user?.isAdmin}
+							<Container class="flex flex-col space-y-16">
+								<Container class="bg-primary-800 rounded-xl p-8" on:enter={scrollIntoView({ vertical: 64 })}>
+									<h1 class="mb-4 header1">Sonarr</h1>
+									<SonarrIntegration let:stale let:handleSave>
+										<Button disabled={!stale} type="primary-dark" action={handleSave}>Save</Button>
+									</SonarrIntegration>
+								</Container>
 
-						<Container
-							class="bg-primary-800 rounded-xl p-8"
-							on:enter={scrollIntoView({ vertical: 64 })}
-						>
-							<h1 class="mb-4 header1">Radarr</h1>
-							<RadarrIntegration let:stale let:handleSave>
-								<Button disabled={!stale} type="primary-dark" action={handleSave}>Save</Button>
-							</RadarrIntegration>
-						</Container>
-					</Container>
+								<Container class="bg-primary-800 rounded-xl p-8" on:enter={scrollIntoView({ vertical: 64 })}>
+									<h1 class="mb-4 header1">Radarr</h1>
+									<RadarrIntegration let:stale let:handleSave>
+										<Button disabled={!stale} type="primary-dark" action={handleSave}>Save</Button>
+									</RadarrIntegration>
+								</Container>
+							</Container>
+						{/if}
 
 					<Container class="flex flex-col space-y-16">
 						<Container
 							class="bg-primary-800 rounded-xl p-8"
 							on:enter={scrollIntoView({ vertical: 64 })}
 						>
-							<h1 class="mb-4 header1">Tmdb Account</h1>
-							<TmdbIntegration let:connected>
-								{#if !connected}
-									<div class="flex space-x-4 mt-4">
-										<Button
-											type="primary-dark"
-											iconAfter={ArrowRight}
-											on:clickOrSelect={() => createModal(TmdbIntegrationConnectDialog, {})}
-										>
-											Connect
-										</Button>
-									</div>
-								{/if}
-							</TmdbIntegration>
+						{#if $user?.isAdmin}
+						<h1 class="mb-4 header1">Tmdb Admin Account</h1>
+						<TmdbAdminIntegration let:connected>
+							{#if !connected}
+								<div class="flex flex-col space-y-4 mt-4">
+									<p class="mb-4 text-yellow-500">
+										This account will be the default account used for all users if they haven't connected their own account.
+									</p>
+									<Button
+										type="primary-dark"
+										iconAfter={ArrowRight}
+										on:clickOrSelect={() => createModal(TmdbIntegrationConnectDialog, {})}
+									>
+										Connect the default account
+									</Button>
+								</div>
+							{/if}
+						</TmdbAdminIntegration>
+					{:else}
+						<h1 class="mb-4 header1">Tmdb User Account</h1>
+						<TmdbIntegration let:connected>
+							{#if !connected}
+								<div class="flex flex-col space-y-4 mt-4">
+									<p class="mb-4" class:text-yellow-500={adminTmdbConfigured} class:text-red-500={!adminTmdbConfigured}>
+										{#if adminTmdbConfigured}
+											You are using the admin TMDb account because you have not connected your own account.
+										{:else}
+											The administrator has not configured their TMDb account for the best experience. Please connect your own account.
+										{/if}
+									</p>
+									<Button
+										type="primary-dark"
+										iconAfter={ArrowRight}
+										on:clickOrSelect={() => createModal(TmdbIntegrationConnectDialog, {})}
+									>
+										Connect your own TMDb account
+									</Button>
+								</div>
+							{/if}
+						</TmdbIntegration>
+						{/if}
 
 							<!--{#await tmdbAccount then tmdbAccount}-->
 							<!--	{#if tmdbAccount}-->
@@ -310,6 +377,14 @@
 					</Container>
 				</Container>
 			</div>
+		</Tab>
+
+		<Tab {...tab} tab={Tabs.RequestSettings} class="w-full">
+			{#if $user?.isAdmin}
+				<RequestSettings />
+			{:else}
+				<p class="text-red-500">You must be an administrator to manage these settings.</p>
+			{/if}
 		</Tab>
 
 		<Tab {...tab} tab={Tabs.About}>

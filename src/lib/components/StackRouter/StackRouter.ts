@@ -12,6 +12,7 @@ import PageNotFound from '../../pages/PageNotFound.svelte';
 import ManagePage from '../../pages/ManagePage.svelte';
 import PersonPage from '../../pages/PersonPage.svelte';
 import UsersPage from '../../pages/UsersPage.svelte';
+import RequestsPage from '../../pages/RequestsPage.svelte';
 
 interface Page {
 	id: symbol;
@@ -23,7 +24,7 @@ interface Route {
 	path: string;
 	component: ComponentType;
 	default?: boolean;
-	// When root is navigated to, stcak is cleared
+	// When root is navigated to, stack is cleared
 	root?: boolean;
 	// Parent route, that is always rendered under this route,
 	// possibly sharing props that are a subset of the child's props.
@@ -247,6 +248,12 @@ const manageRoute: Route = {
 	root: true
 };
 
+const RequestsPageRoute: Route = {
+	path: '/requests',
+	component: RequestsPage,
+	root: true
+};
+
 const notFoundRoute: Route = {
 	path: '/404',
 	component: PageNotFound,
@@ -264,7 +271,8 @@ export const stackRouter = useStackRouter({
 		personRoute,
 		libraryRoute,
 		searchRoute,
-		manageRoute
+		manageRoute,
+		RequestsPageRoute
 	],
 	notFound: notFoundRoute
 });

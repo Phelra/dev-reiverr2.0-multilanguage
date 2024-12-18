@@ -7,6 +7,7 @@
 	import StackRouter from './lib/components/StackRouter/StackRouter.svelte';
 	import { stackRouter } from './lib/components/StackRouter/StackRouter';
 	import OnboardingPage from './lib/pages/OnboardingPage.svelte';
+	import OnboardingPageAdmin from './lib/pages/OnboardingPageAdmin.svelte';
 	import { onMount } from 'svelte';
 	import axios from 'axios';
 	import NotificationStack from './lib/components/Notifications/NotificationStack.svelte';
@@ -19,7 +20,7 @@
 	import UsersPage from './lib/pages/UsersPage.svelte';
 
 	user.subscribe((s) => console.log('user', s));
-	sessions.subscribe((s) => console.log('sessions', s));
+	sessions.subscribe((s) => console.log('Current sessions state:', s));
 
 	// onMount(() => {
 	// 	if (isTizen()) {
@@ -63,7 +64,11 @@
 {:else if $user === null}
 	<UsersPage />
 {:else if $user.onboardingDone === false}
-	<OnboardingPage />
+	{#if $user.isAdmin}
+		<OnboardingPageAdmin />
+	{:else}
+		<OnboardingPage />
+	{/if}
 {:else}
 	<!--		<Router primary={false}>-->
 	<!--		<Container class="flex flex-col relative" direction="horizontal" trapFocus>-->
@@ -85,6 +90,7 @@
 	<!--				<Route path="*">-->
 	<!--					<PageNotFound />-->
 	<!--				</Route>-->
+	{console.log('Displaying main content for authenticated user')}
 	<StackRouter stack={stackRouter} />
 	<!--		</Container>-->
 	<!--		</Router>-->

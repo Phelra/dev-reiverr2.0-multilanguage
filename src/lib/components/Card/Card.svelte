@@ -9,6 +9,8 @@
 	import AnimatedSelection from '../AnimateScale.svelte';
 	import { navigate } from '../StackRouter/StackRouter';
 	import { getCardDimensions } from '../../utils';
+	import { localSettings } from '../../stores/localstorage.store';
+
 
 	export let tmdbId: number | undefined = undefined;
 	export let tvdbId: number | undefined = undefined;
@@ -64,10 +66,9 @@
 					'h-32 w-56': size === 'sm' && orientation === 'landscape',
 					'w-44 h-64': size === 'md' && orientation === 'portrait',
 					'h-44 w-80': size === 'md' && orientation === 'landscape',
-					// 'w-60 h-96': size === 'lg' && orientation === 'portrait',
+					'w-60 h-96': size === 'lg' && orientation === 'portrait',
 					'h-60 w-96': size === 'lg' && orientation === 'landscape',
-					'w-full h-96': size === 'dynamic',
-					'shadow-lg': shadow
+					'w-full h-96': size === 'dynamic'
 				}
 			)}
 			style={`width: ${dimensions.width}px; height: ${dimensions.height}px;`}
@@ -152,6 +153,41 @@
 					<ProgressBar {progress} />
 				</div>
 			{/if}
+			{#if rating && $localSettings.showRatingOnCard === true}
+			<div class="absolute bottom-2 right-2 w-12 h-12">
+				<svg class="CircularProgressbar" viewBox="0 0 100 100">
+					<path
+						d="M 50,50 m 0,-35 a 35,35 0 1,1 0,70 a 35,35 0 1,1 0,-70"
+						stroke-width="9"
+						fill-opacity="0"
+						style="stroke-dasharray: 220px, 220px; stroke-dashoffset: 0px; stroke: rgba(0, 0, 0, 0.2);"
+					></path>
+					<path
+						d="M 50,50 m 0,-35 a 35,35 0 1,1 0,70 a 35,35 0 1,1 0,-70"
+						stroke-width="9"
+						fill-opacity="0"
+						stroke-linecap="round"
+						style="stroke: {rating >= 7 ? 'green' : rating >= 4 ? 'orange' : 'red'};
+							   stroke-dasharray: 220px, 220px;
+							   stroke-dashoffset: {220 - (rating / 10) * 220}px;"
+					></path>
+					<text
+						x="50"
+						y="55"
+						font-size="28"
+						font-weight="bold"
+						fill="hsl(40 20% 80%)"
+						text-anchor="middle"
+						alignment-baseline="middle"
+						class="text-stone-300"
+						style="text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8)"
+					>
+						{rating.toFixed(1)}
+					</text>
+				</svg>
+			</div>
+		{/if}
+				
 		</Container>
 	</AnimatedSelection>
 </div>

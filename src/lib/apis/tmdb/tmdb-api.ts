@@ -3,10 +3,10 @@ import { get } from 'svelte/store';
 import type { operations, paths } from './tmdb.generated';
 import type { operations as operations4, paths as paths4 } from './tmdb4.generated';
 import { TMDB_API_KEY, TMDB_BACKDROP_SMALL } from '../../constants';
-import { settings } from '../../stores/settings.store';
+import { generalSettings } from '../../stores/generalSettings.store';
+import { user } from '../../stores/user.store';
 import type { TitleType } from '../../types';
 import type { Api } from '../api.interface';
-import { user } from '../../stores/user.store';
 
 const CACHE_ONE_DAY = 'max-age=86400';
 const CACHE_FOUR_DAYS = 'max-age=345600';
@@ -55,13 +55,20 @@ export interface TmdbSeriesFull2 extends TmdbSeries2 {
 
 export class TmdbApi implements Api<paths> {
 	static getClient() {
-		return createClient<paths>({
-			baseUrl: 'https://api.themoviedb.org',
-			headers: {
-				Authorization: `Bearer ${TMDB_API_KEY}`
-			}
-		});
-	}
+    const apiKey = TMDB_API_KEY;
+    if (!apiKey) {
+        console.error('TMDB API key is missing');
+        throw new Error('TMDB API key is missing');
+    }
+
+    return createClient<paths>({
+        baseUrl: 'https://api.themoviedb.org',
+        headers: {
+            Authorization: `Bearer ${apiKey}`
+        }
+    });
+}
+
 
 	static getClient4() {
 		return createClient<paths4>({
@@ -73,8 +80,11 @@ export class TmdbApi implements Api<paths> {
 	}
 
 	static getClient4l() {
-		const sessionId = get(user)?.settings.tmdb.sessionId;
-
+		const sessionId = get(user)?.settings.tmdb?.sessionId || get(generalSettings)?.data?.integrations.tmdb?.sessionId;
+		if (!sessionId) {
+			throw new Error('TMDB session ID is missing');
+		}
+	
 		return createClient<paths4>({
 			baseUrl: 'https://api.themoviedb.org',
 			headers: {
@@ -96,11 +106,11 @@ export class TmdbApi implements Api<paths> {
 	}
 
 	getSessionId() {
-		return get(user)?.settings.tmdb.sessionId;
+		return get(user)?.settings.tmdb?.sessionId || get(generalSettings)?.data?.integrations.tmdb?.sessionId;
 	}
 
 	getUserId() {
-		return get(user)?.settings.tmdb.userId;
+		return get(user)?.settings.tmdb?.userId || get(generalSettings)?.data?.integrations.tmdb?.userId;
 	}
 
 	// MOVIES
@@ -114,7 +124,7 @@ export class TmdbApi implements Api<paths> {
 					},
 					query: {
 						append_to_response: 'videos,credits,external_ids,images',
-						...({ include_image_language: get(settings)?.language + ',en,null' } as any)
+						...({ include_image_language: get(generalSettings)?.data?.language + ',en,null' } as any)
 					}
 				}
 			})
@@ -126,8 +136,8 @@ export class TmdbApi implements Api<paths> {
 			?.GET('/3/movie/popular', {
 				params: {
 					query: {
-						language: get(settings)?.language,
-						region: get(settings)?.discover.region
+						language: get(generalSettings)?.data?.language,
+						region: get(generalSettings)?.data?.discover?.region
 					}
 				}
 			})
@@ -153,7 +163,7 @@ export class TmdbApi implements Api<paths> {
 			.then((res) => res.data?.tv_results?.[0] as TmdbSeries2 | undefined);
 
 	getTmdbIdFromTvdbId = async (tvdbId: number) =>
-		getTmdbSeriesFromTvdbId(String(tvdbId)).then((res: any) => {
+		this.getTmdbSeriesFromTvdbId(String(tvdbId)).then((res: any) => {
 			const id = res?.id as number | undefined;
 			if (!id) return Promise.reject();
 			return id;
@@ -168,7 +178,7 @@ export class TmdbApi implements Api<paths> {
 					},
 					query: {
 						append_to_response: 'videos,aggregate_credits,external_ids,images',
-						...({ include_image_language: get(settings)?.language + ',en,null' } as any)
+						...({ include_image_language: get(generalSettings)?.data?.language + ',en,null' } as any)
 					}
 				},
 				headers: {
@@ -213,7 +223,7 @@ export class TmdbApi implements Api<paths> {
 			.GET('/3/tv/popular', {
 				params: {
 					query: {
-						language: get(settings)?.language
+						language: get(generalSettings)?.language
 					}
 				}
 			})
@@ -240,6 +250,27 @@ export class TmdbApi implements Api<paths> {
 				}
 			})
 			.then((res) => res.data?.results || []);
+
+	getCollection = async (collectionId: number) => {
+		return this.getClient()
+			?.GET('/3/collection/{collection_id}', {
+				params: {
+					path: {
+						collection_id: collectionId
+					},
+					query: {
+						append_to_response: 'images,parts',
+						language: get(generalSettings)?.data?.language || 'en'
+					}
+				}
+			})
+			.then((res) => res.data)
+			.catch((error) => {
+				console.error(`Error fetching collection with ID ${collectionId}:`, error);
+				throw new Error(`Unable to fetch collection ${collectionId}`);
+			});
+	};
+
 
 	getEpisode = (
 		seriesId: number,
@@ -461,7 +492,12 @@ export class TmdbApi implements Api<paths> {
 
 	getConnectAccountLink = () =>
 		this.getClient4()
-			?.POST('/4/auth/request_token', {})
+			?.POST('/4/auth/request_token', {
+				body: {
+					// @ts-ignore
+					redirect_to: 'https://www.themoviedb.org/'
+				}
+			})
 			.then((res) => res.data);
 
 	getAccountAccessToken = (requestToken: string) =>
@@ -536,7 +572,7 @@ export const getTmdbMovie = async (tmdbId: number) =>
 			},
 			query: {
 				append_to_response: 'videos,credits,external_ids,images',
-				...({ include_image_language: get(settings)?.language + ',en,null' } as any)
+				...({ include_image_language: get(generalSettings)?.language + ',en,null' } as any)
 			}
 		}
 	}).then((res) => res.data as TmdbMovieFull2 | undefined);
@@ -571,7 +607,7 @@ export const getTmdbSeries = async (tmdbId: number): Promise<TmdbSeriesFull2 | u
 			},
 			query: {
 				append_to_response: 'videos,aggregate_credits,external_ids,images',
-				...({ include_image_language: get(settings)?.language + ',en,null' } as any)
+				...({ include_image_language: get(generalSettings)?.language + ',en,null' } as any)
 			}
 		},
 		headers: {
@@ -628,7 +664,7 @@ export const getTmdbSeriesBackdrop = async (tmdbId: number) =>
 			.then(
 				(r) =>
 					(
-						r?.backdrops?.find((b) => b.iso_639_1 === get(settings)?.language) ||
+						r?.backdrops?.find((b) => b.iso_639_1 === get(generalSettings)?.language) ||
 						r?.backdrops?.find((b) => b.iso_639_1 === 'en') ||
 						r?.backdrops?.find((b) => b.iso_639_1) ||
 						r?.backdrops?.[0]
@@ -643,7 +679,7 @@ export const getTmdbMovieBackdrop = async (tmdbId: number) =>
 			.then(
 				(r) =>
 					(
-						r?.backdrops?.find((b) => b.iso_639_1 === get(settings)?.language) ||
+						r?.backdrops?.find((b) => b.iso_639_1 === get(generalSettings)?.language) ||
 						r?.backdrops?.find((b) => b.iso_639_1 === 'en') ||
 						r?.backdrops?.find((b) => b.iso_639_1) ||
 						r?.backdrops?.[0]
@@ -656,6 +692,12 @@ export const getTmdbSeriesPoster = async (tmdbId: number) =>
 
 export const getTmdbMoviePoster = async (tmdbId: number) =>
 	getTmdbCache(posterCache, tmdbId, () => getTmdbMovie(tmdbId).then((m) => m?.poster_path));
+
+export const getTmdbMoviePosterLandscape = async (tmdbId: number) =>
+	getTmdbCache(posterCache, tmdbId, () =>
+		getTmdbMovie(tmdbId)
+			.then((m) => m?.images?.posters?.find((poster) => poster.iso_639_1 === 'en')?.file_path)
+	);
 
 /** Discover */
 
@@ -735,7 +777,7 @@ export const getTmdbItemBackdrop = (item: {
 	images: { backdrops: { file_path: string; iso_639_1: string }[] };
 }) =>
 	(
-		item?.images?.backdrops?.find((b) => b.iso_639_1 === get(settings)?.language) ||
+		item?.images?.backdrops?.find((b) => b.iso_639_1 === get(generalSettings)?.language) ||
 		item?.images?.backdrops?.find((b) => b.iso_639_1 === 'en') ||
 		item?.images?.backdrops?.find((b) => b.iso_639_1) ||
 		item?.images?.backdrops?.[0]

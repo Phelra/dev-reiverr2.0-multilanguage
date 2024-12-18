@@ -2,6 +2,12 @@
 	import Container from '../../../Container.svelte';
 	import HeroCarousel from '../HeroCarousel/HeroCarousel.svelte';
 	import DetachedPage from '../DetachedPage/DetachedPage.svelte';
+	import ScrollHelper from '../ScrollHelper.svelte';
+	import Carousel from '../Carousel/Carousel.svelte';
+	import TmdbPersonCard from '../PersonCard/TmdbPersonCard.svelte';
+	import TmdbCard from '../Card/TmdbCard.svelte';
+	import EpisodeGrid from './EpisodeGrid.svelte';
+	import Button from '../Button.svelte';
 	import { useRequest } from '../../stores/data.store';
 	import { tmdbApi } from '../../apis/tmdb/tmdb-api';
 	import { PLATFORM_WEB, TMDB_IMAGES_ORIGINAL } from '../../constants';
@@ -13,121 +19,229 @@
 		type EpisodeFileResource,
 		sonarrApi
 	} from '../../apis/sonarr/sonarr-api';
-	import Button from '../Button.svelte';
 	import { playerState } from '../VideoPlayer/VideoPlayer';
 	import { createModal, modalStack } from '../Modal/modal.store';
-	import { get } from 'svelte/store';
+	import { get, writable } from 'svelte/store';
 	import { scrollIntoView, useRegistrar } from '../../selectable';
-	import ScrollHelper from '../ScrollHelper.svelte';
-	import Carousel from '../Carousel/Carousel.svelte';
-	import TmdbPersonCard from '../PersonCard/TmdbPersonCard.svelte';
-	import TmdbCard from '../Card/TmdbCard.svelte';
-	import EpisodeGrid from './EpisodeGrid.svelte';
-	import { formatSize } from '../../utils';
 	import FileDetailsDialog from './FileDetailsDialog.svelte';
-	import SonarrMediaManagerModal from '../MediaManagerModal/SonarrMediaManagerModal.svelte';
-	import MMAddToSonarrDialog from '../MediaManagerModal/MMAddToSonarrDialog.svelte';
 	import ConfirmDialog from '../Dialog/ConfirmDialog.svelte';
 	import DownloadDetailsDialog from './DownloadDetailsDialog.svelte';
+	import { user } from '../../stores/user.store';
+	import { reiverrApi } from '../../apis/reiverr/reiverr-api'; 
+	import { generalSettings } from '../../stores/generalSettings.store';
+	import { formatSize } from '../../utils';
+	import { createSerieRequest, createSerieRequestApprouved } from '../Requests/requestCreation';
+	import { getOrAddSeriesToSonarr } from '../MediaManagerAuto/addSerieToSonarrAutomatically';
+	import { SelectSeasonAndEpisode } from './SelectSeasonAndEpisode';
+	import { searchSeriesMedia } from '../MediaManagerAuto/searchMedia';
 
 	export let id: string;
+	const tmdbId = Number(id);
+	let requestExists = false;
+	let pendingRequest = false;
+	let requestedSeasons = writable<number[]>([]);
 
-	const { promise: tmdbSeries, data: tmdbSeriesData } = useRequest(
-		tmdbApi.getTmdbSeries,
-		Number(id)
-	);
-	let sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
-	const { promise: recommendations } = useRequest(tmdbApi.getSeriesRecommendations, Number(id));
+	let scrollTop: number;
+    export let loadingMessage = writable('');
 
+
+	const { promise: tmdbSeries, data: tmdbSeriesData } = useRequest(tmdbApi.getTmdbSeries, tmdbId);
+	let sonarrItem = sonarrApi.getSeriesByTmdbId(tmdbId);
+	const { promise: recommendations } = useRequest(tmdbApi.getSeriesRecommendations, tmdbId);
+	const jellyfinSeries = getJellyfinSeries(id);
+	const jellyfinEpisodes = jellyfinSeries.then(s => (s && jellyfinApi.getJellyfinEpisodes(s.Id)) || []);
+	const nextJellyfinEpisode = jellyfinEpisodes.then(items => items.find(i => i.UserData?.Played === false));
+	const episodeCards = useRegistrar();
+	const currentUser = get(user);
+	let completedSeasons = writable<number[]>([]);
+	let downloadingSeasons = writable<number[]>([]);
+
+	$: allowRequests = $generalSettings?.data?.requests?.allowRequests ?? true;
 	$: sonarrDownloads = getDownloads(sonarrItem);
 	$: sonarrFiles = getFiles(sonarrItem);
-	$: sonarrSeasonNumbers = Promise.all([sonarrFiles, sonarrDownloads]).then(
-		([files, downloads]) => [
-			...new Set(files.map((item) => item.seasonNumber || -1)),
-			...new Set(downloads.map((item) => item.seasonNumber || -1))
-		]
-	);
+	$: sonarrSeasonNumbers = Promise.all([sonarrFiles, sonarrDownloads]).then(([files, downloads]) => [...new Set(files.map(item => item.seasonNumber || -1)), ...new Set(downloads.map(item => item.seasonNumber || -1))]);
 	$: sonarrEpisodes = Promise.all([sonarrItem, sonarrSeasonNumbers])
-		.then(([item, seasons]) =>
-			Promise.all(seasons.map((s) => sonarrApi.getEpisodes(item?.id || -1, s)))
-		)
-		.then((items) => items.flat());
+		.then(([item, seasons]) => Promise.all(seasons.map(s => sonarrApi.getEpisodes(item?.id || -1, s))))
+		.then(items => items.flat());
 
-	const jellyfinSeries = getJellyfinSeries(id);
 
-	const jellyfinEpisodes = jellyfinSeries.then(
-		(s) => (s && jellyfinApi.getJellyfinEpisodes(s.Id)) || []
-	);
+	$: (async () => {
+        const item = await sonarrItem;
+        if (item) {
+            const seasonNumbers = item.seasons
+                .map(s => s.seasonNumber)
+                .filter(n => n > 0);
+            const statusPromises = seasonNumbers.map(seasonNumber => 
+                sonarrApi.isSeasonFullyDownloaded(item.id, seasonNumber)
+                    .then(isCompleted => isCompleted ? seasonNumber : null)
+                    .catch(error => {
+                        log(`Error checking season ${seasonNumber}: ${error}`);
+                        return null;
+                    })
+            );
 
-	const nextJellyfinEpisode = jellyfinEpisodes.then((items) =>
-		items.find((i) => i.UserData?.Played === false)
-	);
+            const statusResults = await Promise.all(statusPromises);
 
-	const episodeCards = useRegistrar();
-	let scrollTop: number;
+            const completed = statusResults.filter(season => season !== null) as number[];
 
-	// let hideInterface = false;
-	// modalStack.top.subscribe((modal) => {
-	// 	hideInterface = !!modal;
-	// });
+            const downloading = await sonarrApi.getDownloadsBySeriesId(item.id)
+                .then(downloads => downloads.map(d => d.episode?.seasonNumber).filter(s => s !== undefined))
+                .catch(error => {
+                    log(`Error fetching downloading seasons: ${error}`);
+                    return [];
+                });
+
+            completedSeasons.set(completed);
+            downloadingSeasons.set(downloading);
+        } else {
+            completedSeasons.set([]);
+            downloadingSeasons.set([]);
+        }
+    })();
 
 	function getJellyfinSeries(id: string) {
 		return jellyfinApi.getLibraryItemFromTmdbId(id);
 	}
 
-	const onGrabRelease = () => setTimeout(() => (sonarrDownloads = getDownloads(sonarrItem)), 8000);
-
-	function handleAddedToSonarr() {
-		sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
-		sonarrItem.then(
-			(sonarrItem) =>
-				sonarrItem &&
-				createModal(SonarrMediaManagerModal, {
-					season: 1,
-					sonarrItem,
-					onGrabRelease
-				})
-		);
+	function getFiles(item: typeof sonarrItem) {
+		return item.then(item => (item ? sonarrApi.getFilesBySeriesId(item?.id || -1) : []));
 	}
 
-	async function handleRequestSeason(season: number) {
-		return sonarrItem.then((sonarrItem) => {
-			const tmdbSeries = get(tmdbSeriesData);
-			if (sonarrItem) {
-				createModal(SonarrMediaManagerModal, {
-					season,
-					sonarrItem,
-					onGrabRelease
-				});
-			} else if (tmdbSeries) {
-				createModal(MMAddToSonarrDialog, {
-					title: tmdbSeries.name || '',
-					tmdbId: tmdbSeries.id || -1,
-					backdropUri: tmdbSeries.backdrop_path || '',
-					onComplete: handleAddedToSonarr
-				});
-			} else {
-				console.error('No series found');
+	function getDownloads(item: typeof sonarrItem) {
+		return item.then(item => (item ? sonarrApi.getDownloadsBySeriesId(item?.id || -1) : []));
+	}
+
+	function formatRequestedSeasons(seasons: number[]) {
+		if (seasons.length === 0) return '';
+		if (seasons.length === 1) return `Requested Season ${seasons[0]}`;
+		const allButLast = seasons.slice(0, -1).join(', ');
+		const last = seasons[seasons.length - 1];
+		return `Requested Seasons ${allButLast} & ${last}`;
+	}
+
+	(async () => {
+  try {
+    const existingRequests = (await reiverrApi.getRequestsByMediaId(tmdbId)) || [];
+    if (Array.isArray(existingRequests)) {
+      requestExists = existingRequests.length > 0;
+      pendingRequest = existingRequests.some(request => request.status === 'Pending');
+      const pendingRequestedSeasons = existingRequests
+	.filter(request => request.status === 'Pending')
+	.map(request => request.season);
+	requestedSeasons.set(pendingRequestedSeasons);
+    } else {
+      console.error('Expected an array for existingRequests, but got:', typeof existingRequests);
+    }
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  }
+})();
+
+	async function handleRequestSeason() {
+		try {
+			const tmdbSeries = $tmdbSeriesData;
+			const sonarrItem = await getOrAddSeriesToSonarr(
+				tmdbSeries.id,
+				tmdbSeries.name,
+				() => console.log('Series added successfully.')
+			);
+			
+			if (!sonarrItem) {
+				console.error('Failed to process series in Sonarr.');
+				return;
+			}
+
+			const userSelection = await SelectSeasonAndEpisode(sonarrItem,requestedSeasons);
+			console.log('Request SelectSeasonAndEpisode:', userSelection);
+			await checkQuotaAndCreateRequest(sonarrItem, userSelection.season, userSelection.episode, userSelection.monitored);
+		} catch (error) {
+			console.error('Error handling request for season:', error);
+		}
+	}
+
+	async function checkQuotaAndCreateRequest(sonarrItem: any, season: number, episode: number, monitored: boolean) {
+		const userId = currentUser?.id;
+		const settings = get(generalSettings);
+		const days = settings.data?.requests?.delayInDays ?? 30;
+		const maxRequests = settings.data?.requests?.defaultLimitTV ?? 3;
+		const userRequestCount = await reiverrApi.countRequestsInPeriodForUser(userId, days);
+		const remainingRequests = Math.max(0, maxRequests - userRequestCount);
+		const approvalMethod = settings.data?.requests.approvalMethod ?? 0;
+		const setLimit = settings.data?.requests.setLimit ?? false;
+		const canAutoApprove = currentUser?.isAdmin || (remainingRequests > 0 && approvalMethod === 0 && setLimit == true);
+
+		if (canAutoApprove) {
+		createApprovedRequestDialog(sonarrItem, remainingRequests, days, maxRequests, season, monitored, episode, approvalMethod);
+		} else {
+		createPendingRequestDialog(season, episode);
+		}
+	}
+
+	function createApprovedRequestDialog(
+		sonarrItem: any,
+		remainingRequests: number, 
+		days: number, 
+		maxRequests: number,  
+		season: number, 
+		monitored: boolean, 
+		episode?: number, 
+		approvalMethod?: number
+) {
+		let bodyMessage = '';
+
+		if (currentUser?.isAdmin) {
+			bodyMessage = `As an administrator, you can approve this download without any limitations.`;
+		} else if (approvalMethod === 1) {
+			bodyMessage = `Your request will be automatically approved, and the media search will begin.`;
+		} else if (remainingRequests > 0 && approvalMethod === 0) {
+			bodyMessage = `You have ${remainingRequests}/${maxRequests} requests remaining that will be automatically approved. Requests reset every ${days} days.`;
+		} else {
+			bodyMessage = `You have reached your limit of ${maxRequests} requests. Requests reset every ${days} days. Further requests will require admin approval.`;
+		}
+
+		createModal(ConfirmDialog, {
+		header: 'Confirm automatic search',
+		body: bodyMessage,
+		confirm: async () => {
+			try {
+				const success = await searchSeriesMedia(sonarrItem, season, monitored, episode, true);
+				if (success) {
+					console.log("user ", currentUser)
+					await createSerieRequestApprouved(sonarrItem.tmdbId, currentUser, season,episode);
+					console.log("Series request approved and logged successfully.");
+				}
+			} catch (error) {
+				console.error('Error while searching or downloading:', error);
+			}
+		}
+	});
+	}
+
+	function createPendingRequestDialog(season: number, episode?: number) {
+		const episodeMessage = episode ? `, episode ${episode}` : '';
+		const bodyMessage = `Do you want to request season ${season}${episodeMessage}? An administrator will have to approve it before it appears in the library.`;
+
+		createModal(ConfirmDialog, {
+			header: 'Confirm Request',
+			body: bodyMessage,
+			confirm: async () => {
+				try {
+					await createSerieRequest(tmdbId, currentUser, season, episode);
+					requestedSeasons.update(seasons => [...seasons, season]); 
+				} catch (error) {
+					console.error('Error handling request for season:', error);
+				}
 			}
 		});
 	}
 
-	async function getFiles(item: typeof sonarrItem) {
-		return item.then((item) => (item ? sonarrApi.getFilesBySeriesId(item?.id || -1) : []));
-	}
-
-	async function getDownloads(item: typeof sonarrItem) {
-		return item.then((item) => (item ? sonarrApi.getDownloadsBySeriesId(item?.id || -1) : []));
-	}
 
 	function createConfirmDeleteSeasonDialog(files: EpisodeFileResource[]) {
 		createModal(ConfirmDialog, {
 			header: 'Delete Season Files?',
 			body: `Are you sure you want to delete all ${files.length} file(s) from season ${files[0]?.seasonNumber}?`,
 			confirm: () =>
-				sonarrApi
-					.deleteSonarrEpisodes(files.map((f) => f.id || -1))
-					.then(() => (sonarrFiles = getFiles(sonarrItem)))
+				sonarrApi.deleteSonarrEpisodes(files.map(f => f.id || -1)).then(() => (sonarrFiles = getFiles(sonarrItem)))
 		});
 	}
 
@@ -136,12 +250,11 @@
 			header: 'Cancel Season Downloads?',
 			body: `Are you sure you want to cancel all ${downloads.length} download(s) from season ${downloads[0]?.seasonNumber}?`,
 			confirm: () =>
-				sonarrApi
-					.cancelDownloads(downloads.map((f) => f.id || -1))
-					.then(() => (sonarrDownloads = getDownloads(sonarrItem)))
+				sonarrApi.cancelDownloads(downloads.map(d => d.id || -1)).then(() => (sonarrDownloads = getDownloads(sonarrItem)))
 		});
 	}
 </script>
+  
 
 <DetachedPage let:handleGoBack let:registrar>
 	<ScrollHelper bind:scrollTop />
@@ -156,7 +269,7 @@
 				}
 			}}
 		>
-			<HeroCarousel
+		<HeroCarousel
 				urls={$tmdbSeries.then(
 					(series) =>
 						series?.images.backdrops
@@ -164,7 +277,7 @@
 							?.map((i) => TMDB_IMAGES_ORIGINAL + i.file_path)
 							.slice(0, 5) || []
 				)}
-			>
+		>
 				<Container />
 				<div class="h-full flex-1 flex flex-col justify-end">
 					{#await $tmdbSeries then series}
@@ -195,9 +308,13 @@
 								<DotFilled />
 								<p class="flex-shrink-0">
 									<a href={'https://www.themoviedb.org/movie/' + series.id}
-										>{series.vote_average} TMDB</a
-									>
+										>{series.vote_average} TMDB</a>
 								</p>
+								{#if $requestedSeasons.length > 0}
+									<div class="py-0.10 px-3 rounded-lg" style="color: white; background-color: #ffa500; border-radius: 20px; display: inline-block; font-size: 0.75rem;">
+										{formatRequestedSeasons($requestedSeasons)}
+									</div>
+								{/if}
 							</div>
 							<div
 								class="text-stone-300 font-medium line-clamp-3 opacity-75 max-w-4xl mt-4 text-lg"
@@ -206,14 +323,14 @@
 							</div>
 						{/if}
 					{/await}
-					{#await nextJellyfinEpisode then nextJellyfinEpisode}
-						<Container
-							direction="horizontal"
-							class="flex mt-8"
-							focusOnMount
-							on:back={handleGoBack}
-							on:mount={registrar}
-						>
+					<Container
+						direction="horizontal"
+						class="flex mt-8"
+						focusOnMount
+						on:back={handleGoBack}
+						on:mount={registrar}
+					>
+						{#await nextJellyfinEpisode then nextJellyfinEpisode}
 							{#if nextJellyfinEpisode}
 								<Button
 									class="mr-4"
@@ -224,25 +341,29 @@
 									{nextJellyfinEpisode?.IndexNumber}
 									<Play size={19} slot="icon" />
 								</Button>
-							{:else}
-								<Button class="mr-4" action={() => handleRequestSeason(1)}>
-									Request
-									<Plus size={19} slot="icon" />
-								</Button>
 							{/if}
+						{/await}
+						<Button
+							class="mr-4"
+							on:clickOrSelect={() => handleRequestSeason()}
+							disabled={!allowRequests}
+						>
+							Request
+							<Plus size={19} slot="icon" />
+						</Button>			
 
-							{#if PLATFORM_WEB}
-								<Button class="mr-4">
-									Open In TMDB
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-								<Button class="mr-4">
-									Open In Jellyfin
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-							{/if}
-						</Container>
-					{/await}
+						{#if PLATFORM_WEB}
+							<Button class="mr-4">
+								Open In TMDB
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+							<Button class="mr-4">
+								Open In Jellyfin
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+						{/if}
+				</Container>
+
 				</div>
 			</HeroCarousel>
 		</Container>
@@ -308,7 +429,7 @@
 				</Container>
 			{/await}
 			{#await Promise.all( [sonarrSeasonNumbers, sonarrFiles, sonarrEpisodes, sonarrDownloads] ) then [seasons, files, episodes, downloads]}
-				{#if files?.length}
+				{#if currentUser?.isAdmin && files?.length}
 					<Container
 						class="flex-1 bg-secondary-950 pt-8 pb-16 px-32 flex flex-col"
 						on:enter={scrollIntoView({ top: 32 })}

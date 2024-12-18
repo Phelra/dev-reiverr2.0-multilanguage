@@ -94,16 +94,17 @@
 		{/await}
 
 		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[0]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
+			{#each topGenres.slice(0, 6) as genre, index}
+				{@const genreItems = genreIdToMovie[genre || '']}
+				{#if genreItems?.length}
+					<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
+						<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
+						{#each genreItems || [] as item}
+							<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
+						{/each}
+					</Carousel>
+				{/if}
+			{/each}
 		{/await}
 
 		{#await nowStreaming then nowStreaming}
@@ -115,19 +116,6 @@
 			</Carousel>
 		{/await}
 
-		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[1]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
 		{#await upcomingSeries then upcomingSeries}
 			<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
 				<span slot="header">Upcoming Series</span>
@@ -136,64 +124,5 @@
 				{/each}
 			</Carousel>
 		{/await}
-
-		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[2]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[3]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		<!-- NETWORKS -->
-
-		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[4]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		{#await recommendations then { genreIdToMovie, topGenres }}
-			{@const genre = topGenres[5]}
-			{@const genreItems = genreIdToMovie[genre || '']}
-			{#if genreItems?.length}
-				<Carousel scrollClass="px-32" on:enter={scrollIntoView({ vertical: 128 })}>
-					<span slot="header">{TMDB_SERIES_GENRES.find((g) => g.id == genre)?.name}</span>
-					{#each genreItems || [] as item}
-						<TmdbCard on:enter={scrollIntoView({ horizontal: 128 })} size="lg" {item} />
-					{/each}
-				</Carousel>
-			{/if}
-		{/await}
-
-		<!-- GENRES -->
-		<!-- TOP RATED -->
-		<!-- TRENDING PEOPLE -->
-		<!-- Watchlist -->
 	</div>
 </DetachedPage>

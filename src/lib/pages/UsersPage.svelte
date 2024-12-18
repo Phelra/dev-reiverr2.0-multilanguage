@@ -28,7 +28,9 @@
 
 	function handleSwitchUser({ session, user }: Awaited<typeof users>[number]) {
 		sessions.setActiveSession(session);
+		setTimeout(() => {
 		navigate('/');
+	}, 200);
 	}
 </script>
 
