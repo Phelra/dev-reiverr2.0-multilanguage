@@ -16,7 +16,7 @@
 	import Button from '../Button.svelte';
 	import { playerState } from '../VideoPlayer/VideoPlayer';
 	import { createModal, modalStack } from '../Modal/modal.store';
-	import { get } from 'svelte/store';
+	import { get, writable } from 'svelte/store';
 	import { scrollIntoView, useRegistrar } from '../../selectable';
 	import ScrollHelper from '../ScrollHelper.svelte';
 	import Carousel from '../Carousel/Carousel.svelte';
@@ -25,12 +25,20 @@
 	import EpisodeGrid from './EpisodeGrid.svelte';
 	import { formatSize } from '../../utils';
 	import FileDetailsDialog from './FileDetailsDialog.svelte';
-	import SonarrMediaManagerModal from '../MediaManagerModal/SonarrMediaManagerModal.svelte';
-	import MMAddToSonarrDialog from '../MediaManagerModal/MMAddToSonarrDialog.svelte';
 	import ConfirmDialog from '../Dialog/ConfirmDialog.svelte';
 	import DownloadDetailsDialog from './DownloadDetailsDialog.svelte';
+	import { user } from '../../stores/user.store';
+	import { reiverrApi } from '../../apis/reiverr/reiverr-api'; 
+	import { generalSettings } from '../../stores/generalSettings.store';
+	import { handleMediaRequest } from '../Requests/requestProcess';
 
 	export let id: string;
+	export let loadingMessage = writable('');
+	const tmdbId = Number(id);
+	let requestExists = false;
+	let pendingRequest = false;
+	let requestedSeasons = writable<number[]>([]);
+	let scrollTop: number;
 
 	const { promise: tmdbSeries, data: tmdbSeriesData } = useRequest(
 		tmdbApi.getTmdbSeries,
@@ -39,78 +47,90 @@
 	let sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
 	const { promise: recommendations } = useRequest(tmdbApi.getSeriesRecommendations, Number(id));
 
+	const jellyfinSeries = getJellyfinSeries(id);
+	const jellyfinEpisodes = jellyfinSeries.then(s => (s && jellyfinApi.getJellyfinEpisodes(s.Id)) || []);
+	const nextJellyfinEpisode = jellyfinEpisodes.then(items => items.find(i => i.UserData?.Played === false));
+	const episodeCards = useRegistrar();
+	const currentUser = get(user);
+	let completedSeasons = writable<number[]>([]);
+	let downloadingSeasons = writable<number[]>([]);
+
+	$: allowRequests = $generalSettings?.data?.requests?.allowRequests ?? true;
 	$: sonarrDownloads = getDownloads(sonarrItem);
 	$: sonarrFiles = getFiles(sonarrItem);
-	$: sonarrSeasonNumbers = Promise.all([sonarrFiles, sonarrDownloads]).then(
-		([files, downloads]) => [
-			...new Set(files.map((item) => item.seasonNumber || -1)),
-			...new Set(downloads.map((item) => item.seasonNumber || -1))
-		]
-	);
+	$: sonarrSeasonNumbers = Promise.all([sonarrFiles, sonarrDownloads]).then(([files, downloads]) => [...new Set(files.map(item => item.seasonNumber || -1)), ...new Set(downloads.map(item => item.seasonNumber || -1))]);
 	$: sonarrEpisodes = Promise.all([sonarrItem, sonarrSeasonNumbers])
-		.then(([item, seasons]) =>
-			Promise.all(seasons.map((s) => sonarrApi.getEpisodes(item?.id || -1, s)))
-		)
-		.then((items) => items.flat());
+		.then(([item, seasons]) => Promise.all(seasons.map(s => sonarrApi.getEpisodes(item?.id || -1, s))))
+		.then(items => items.flat());
 
-	const jellyfinSeries = getJellyfinSeries(id);
 
-	const jellyfinEpisodes = jellyfinSeries.then(
-		(s) => (s && jellyfinApi.getJellyfinEpisodes(s.Id)) || []
-	);
+	$: (async () => {
+        const item = await sonarrItem;
+        if (item) {
+            const seasonNumbers = item.seasons
+                .map(s => s.seasonNumber)
+                .filter(n => n > 0);
+            const statusPromises = seasonNumbers.map(seasonNumber => 
+                sonarrApi.isSeasonFullyDownloaded(item.id, seasonNumber)
+                    .then(isCompleted => isCompleted ? seasonNumber : null)
+                    .catch(error => {
+                        log(`Error checking season ${seasonNumber}: ${error}`);
+                        return null;
+                    })
+            );
 
-	const nextJellyfinEpisode = jellyfinEpisodes.then((items) =>
-		items.find((i) => i.UserData?.Played === false)
-	);
+            const statusResults = await Promise.all(statusPromises);
 
-	const episodeCards = useRegistrar();
-	let scrollTop: number;
+            const completed = statusResults.filter(season => season !== null) as number[];
 
-	// let hideInterface = false;
-	// modalStack.top.subscribe((modal) => {
-	// 	hideInterface = !!modal;
-	// });
+            const downloading = await sonarrApi.getDownloadsBySeriesId(item.id)
+                .then(downloads => downloads.map(d => d.episode?.seasonNumber).filter(s => s !== undefined))
+                .catch(error => {
+                    log(`Error fetching downloading seasons: ${error}`);
+                    return [];
+                });
+
+            completedSeasons.set(completed);
+            downloadingSeasons.set(downloading);
+        } else {
+            completedSeasons.set([]);
+            downloadingSeasons.set([]);
+        }
+    })();
 
 	function getJellyfinSeries(id: string) {
 		return jellyfinApi.getLibraryItemFromTmdbId(id);
 	}
 
-	const onGrabRelease = () => setTimeout(() => (sonarrDownloads = getDownloads(sonarrItem)), 8000);
-
-	function handleAddedToSonarr() {
-		sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
-		sonarrItem.then(
-			(sonarrItem) =>
-				sonarrItem &&
-				createModal(SonarrMediaManagerModal, {
-					season: 1,
-					sonarrItem,
-					onGrabRelease
-				})
-		);
+	function formatRequestedSeasons(seasons: number[]) {
+		if (seasons.length === 0) return '';
+		if (seasons.length === 1) return `Requested Season ${seasons[0]}`;
+		const allButLast = seasons.slice(0, -1).join(', ');
+		const last = seasons[seasons.length - 1];
+		return `Requested Seasons ${allButLast} & ${last}`;
 	}
 
-	async function handleRequestSeason(season: number) {
-		return sonarrItem.then((sonarrItem) => {
-			const tmdbSeries = get(tmdbSeriesData);
-			if (sonarrItem) {
-				createModal(SonarrMediaManagerModal, {
-					season,
-					sonarrItem,
-					onGrabRelease
-				});
-			} else if (tmdbSeries) {
-				createModal(MMAddToSonarrDialog, {
-					title: tmdbSeries.name || '',
-					tmdbId: tmdbSeries.id || -1,
-					backdropUri: tmdbSeries.backdrop_path || '',
-					onComplete: handleAddedToSonarr
-				});
+	async function checkRequests(tmdbId: number, requestedSeasons: any) {
+		try {
+			const existingRequests = (await reiverrApi.getRequestsByMediaId(tmdbId)) || [];
+
+			if (Array.isArray(existingRequests)) {
+			requestExists = existingRequests.length > 0;
+			pendingRequest = existingRequests.some((request) => request.status === 'Pending');
+			const pendingRequestedSeasons = existingRequests
+				.filter((request) => request.status === 'Pending')
+				.map((request) => request.season);
+
+			requestedSeasons.set(pendingRequestedSeasons);
 			} else {
-				console.error('No series found');
+			console.error('Expected an array for existingRequests, but got:', typeof existingRequests);
 			}
-		});
+		} catch (error) {
+			console.error('Error fetching requests:', error);
+		}
 	}
+
+	checkRequests(tmdbId, requestedSeasons);
 
 	async function getFiles(item: typeof sonarrItem) {
 		return item.then((item) => (item ? sonarrApi.getFilesBySeriesId(item?.id || -1) : []));
@@ -198,6 +218,11 @@
 										>{series.vote_average} TMDB</a
 									>
 								</p>
+								{#if $requestedSeasons.length > 0}
+									<div class="py-0.10 px-3 rounded-lg" style="color: white; background-color: #ffa500; border-radius: 20px; display: inline-block; font-size: 0.75rem;">
+										{formatRequestedSeasons($requestedSeasons)}
+									</div>
+								{/if}
 							</div>
 							<div
 								class="text-stone-300 font-medium line-clamp-3 opacity-75 max-w-4xl mt-4 text-lg"
@@ -206,14 +231,13 @@
 							</div>
 						{/if}
 					{/await}
-					{#await nextJellyfinEpisode then nextJellyfinEpisode}
-						<Container
-							direction="horizontal"
-							class="flex mt-8"
-							focusOnMount
-							on:back={handleGoBack}
-							on:mount={registrar}
-						>
+					<Container
+						direction="horizontal"
+						class="flex mt-8"
+						focusOnMount
+						on:back={handleGoBack}
+						on:mount={registrar}>
+						{#await nextJellyfinEpisode then nextJellyfinEpisode}
 							{#if nextJellyfinEpisode}
 								<Button
 									class="mr-4"
@@ -224,25 +248,33 @@
 									{nextJellyfinEpisode?.IndexNumber}
 									<Play size={19} slot="icon" />
 								</Button>
-							{:else}
-								<Button class="mr-4" action={() => handleRequestSeason(1)}>
-									Request
-									<Plus size={19} slot="icon" />
-								</Button>
 							{/if}
+						{/await}
+						<Button
+						class="mr-4"
+						on:click={() => handleMediaRequest("serie",
+							$tmdbSeriesData, 
+							currentUser,
+							(season, episode) => {requestedSeasons.update(seasons => [...seasons, season]);},
+							requestedSeasons
+						)}
+						disabled={!allowRequests}
+						>
+							Request
+						<Plus size={19} slot="icon" />
+						</Button>	
+						{#if PLATFORM_WEB}
+							<Button class="mr-4">
+								Open In TMDB
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+							<Button class="mr-4">
+								Open In Jellyfin
+								<ExternalLink size={19} slot="icon-after" />
+							</Button>
+						{/if}
+				</Container>
 
-							{#if PLATFORM_WEB}
-								<Button class="mr-4">
-									Open In TMDB
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-								<Button class="mr-4">
-									Open In Jellyfin
-									<ExternalLink size={19} slot="icon-after" />
-								</Button>
-							{/if}
-						</Container>
-					{/await}
 				</div>
 			</HeroCarousel>
 		</Container>
@@ -251,15 +283,15 @@
 				// 'opacity-0': hideInterface
 			})}
 		>
-			<EpisodeGrid
-				on:enter={scrollIntoView({ top: -32, bottom: 128 })}
-				on:mount={episodeCards.registrar}
-				id={Number(id)}
-				tmdbSeries={tmdbSeriesData}
-				{jellyfinEpisodes}
-				currentJellyfinEpisode={nextJellyfinEpisode}
-				{handleRequestSeason}
-			/>
+		<EpisodeGrid
+			on:enter={() => scrollIntoView({ top: -32, bottom: 128 })}
+			on:mount={episodeCards.registrar}
+			id={Number(id)}
+			tmdbSeries={tmdbSeriesData}
+			jellyfinEpisodes={jellyfinEpisodes}
+			currentJellyfinEpisode={nextJellyfinEpisode}
+			handleRequestSeason={(requestedSeasons) => handleRequestSeason($tmdbSeriesData, requestedSeasons,currentUser)}
+		/>
 			<Container on:enter={scrollIntoView({ top: 0 })} class="pt-8">
 				{#await $tmdbSeries then series}
 					<Carousel scrollClass="px-32" class="mb-8">
@@ -308,7 +340,7 @@
 				</Container>
 			{/await}
 			{#await Promise.all( [sonarrSeasonNumbers, sonarrFiles, sonarrEpisodes, sonarrDownloads] ) then [seasons, files, episodes, downloads]}
-				{#if files?.length}
+				{#if currentUser?.isAdmin && files?.length}
 					<Container
 						class="flex-1 bg-secondary-950 pt-8 pb-16 px-32 flex flex-col"
 						on:enter={scrollIntoView({ top: 32 })}

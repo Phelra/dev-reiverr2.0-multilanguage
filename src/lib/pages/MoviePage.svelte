@@ -12,7 +12,9 @@
 		File,
 		Play,
 		Plus,
-		Trash
+		Trash,
+    Pencil2,
+    Reload
 	} from 'radix-icons-svelte';
 	import Button from '../components/Button.svelte';
 	import { jellyfinApi } from '../apis/jellyfin/jellyfin-api';
@@ -32,84 +34,143 @@
 	import { capitalize, formatSize } from '../utils';
 	import ConfirmDialog from '../components/Dialog/ConfirmDialog.svelte';
 	import { TMDB_BACKDROP_SMALL } from '../constants.js';
+  import MMEditToRadarrDialog from '../components/MediaManagerModal/MMEditToRadarrDialog.svelte';
+  import { reiverrApi } from '../apis/reiverr/reiverr-api'; 
+  import { user } from '../stores/user.store';  
+  import { generalSettings } from '../stores/generalSettings.store';
+  import { writable, get } from 'svelte/store';
+  import { getOrAddMovieToRadarr } from '../components/MediaManagerAuto/addMovieToRadarrAutomatically';
+  import { handleMediaRequest } from '../components/Requests/requestProcess';
 
-	export let id: string;
-	const tmdbId = Number(id);
+  export let id: string;
+  const tmdbId = Number(id);
+  const currentUser = get(user);
 
-	const tmdbMovie = tmdbApi.getTmdbMovie(tmdbId);
-	$: recommendations = tmdbApi.getMovieRecommendations(tmdbId);
-	const { promise: jellyfinItemP } = useRequest(
-		(id: string) => jellyfinApi.getLibraryItemFromTmdbId(id),
-		id
+  $: recommendations = tmdbApi.getMovieRecommendations(tmdbId);
+  $: collection = tmdbMovie.then(movie => movie?.belongs_to_collection ? tmdbApi.getCollection(movie.belongs_to_collection.id) : null); //rajouter
+  $: allowRequests = $generalSettings?.data?.requests?.allowRequests ?? true;
+
+  let requestExists = writable(false);
+  let pendingRequest = writable(false);
+
+  const { promise: tmdbMovies, data: tmdbMovieData } = useRequest(
+		tmdbApi.getTmdbMovie,
+		Number(id)
 	);
-	const { promise: radarrItemP, send: refreshRadarrItem } = useRequest(
-		radarrApi.getMovieByTmdbId,
-		tmdbId
-	);
 
-	let radarrItem = radarrApi.getMovieByTmdbId(tmdbId);
-	$: radarrDownloads = getDownloads(radarrItem);
-	$: radarrFiles = getFiles(radarrItem);
+  const tmdbMovie = tmdbApi.getTmdbMovie(tmdbId);
+  const { promise: jellyfinItemP } = useRequest(
+      (id: string) => jellyfinApi.getLibraryItemFromTmdbId(id),
+      id
+  );
+  const { promise: radarrItemP, send: refreshRadarrItem } = useRequest(
+      radarrApi.getMovieByTmdbId,
+      tmdbId
+  );
 
-	const { requests, isFetching, data } = useActionRequests({
-		handleAddToRadarr: (id: number) =>
-			radarrApi.addMovieToRadarr(id).finally(() => refreshRadarrItem(tmdbId))
-	});
+  let radarrItem = radarrApi.getMovieByTmdbId(tmdbId);
+  $: radarrDownloads = getDownloads(radarrItem);
+  $: radarrFiles = getFiles(radarrItem);
 
-	async function getFiles(item: typeof radarrItem) {
-		return item.then((item) => (item ? radarrApi.getFilesByMovieId(item?.id || -1) : []));
-	}
+async function checkRequests() {
+  try {
+    const existingRequests = (await reiverrApi.getRequestsByMediaId(tmdbId)) || [];
 
-	async function getDownloads(item: typeof radarrItem) {
-		return item.then((item) => (item ? radarrApi.getDownloadsById(item?.id || -1) : []));
-	}
+    if (Array.isArray(existingRequests)) {
+      const hasRequests = existingRequests.length > 0;
+      const hasPendingRequests = existingRequests.some(request => request.status === 'Pending');
 
-	function handleAddedToRadarr() {
-		radarrItem = radarrApi.getMovieByTmdbId(tmdbId);
-		radarrItem.then(
-			(radarrItem) =>
-				radarrItem && createModal(MovieMediaManagerModal, { radarrItem, onGrabRelease })
-		);
-	}
+      requestExists.set(hasRequests);
+      pendingRequest.set(hasPendingRequests);
+    } else {
+      throw new Error('Expected an array for existingRequests');
+    }
+  } catch (error) {
+    createErrorDialog('Error fetching existing requests', checkRequests);
+  }
+}
+  checkRequests();
 
-	const onGrabRelease = () => setTimeout(() => (radarrDownloads = getDownloads(radarrItem)), 8000);
+  async function getFiles(item: typeof radarrItem) {
+    return item.then((item) => (item ? radarrApi.getFilesByMovieId(item?.id || -1) : []));
+  }
 
-	async function handleRequest() {
-		return radarrItem.then((radarrItem) => {
-			if (radarrItem) createModal(MovieMediaManagerModal, { radarrItem, onGrabRelease });
-			else
-				return tmdbMovie.then((tmdbMovie) => {
-					createModal(MMAddToRadarrDialog, {
-						title: tmdbMovie?.title || '',
-						tmdbId,
-						backdropUri: tmdbMovie?.backdrop_path || '',
-						onComplete: handleAddedToRadarr
-					});
-				});
-		});
-	}
+  async function getDownloads(item: typeof radarrItem) {
+    return item.then((item) => (item ? radarrApi.getDownloadsById(item?.id || -1) : []));
+  }
 
-	function createConfirmDeleteSeasonDialog(files: MovieFileResource[]) {
-		createModal(ConfirmDialog, {
-			header: 'Delete Season Files?',
-			body: `Are you sure you want to delete all ${files.length} file(s)?`, // TODO: These messages  could be better, for series too
-			confirm: () =>
-				radarrApi
-					.deleteFiles(files.map((f) => f.id || -1))
-					.then(() => (radarrFiles = getFiles(radarrItem)))
-		});
-	}
+  function createErrorDialog(error: string, retryCallback: () => void) {
+    createModal(ConfirmDialog, {
+        header: 'Error Occurred',
+        body: `An error occurred: ${error}. Do you want to retry?`,
+        confirm: () => {
+            modalStack.closeTopmost();
+            retryCallback();
+        },
+        cancel: () => modalStack.closeTopmost()
+    });
+}
 
-	function createConfirmCancelDownloadsDialog(downloads: MovieDownload[]) {
-		createModal(ConfirmDialog, {
-			header: 'Cancel Season Downloads?',
-			body: `Are you sure you want to cancel all ${downloads.length} download(s)?`, // TODO: These messages  could be better, for series too
-			confirm: () =>
-				radarrApi
-					.cancelDownloads(downloads.map((f) => f.id || -1))
-					.then(() => (radarrDownloads = getDownloads(radarrItem)))
-		});
-	}
+  function createConfirmDeleteSeasonDialog(files: MovieFileResource[]) {
+    createModal(ConfirmDialog, {
+      header: 'Delete Season Files?',
+      body: `Are you sure you want to delete all ${files.length} file(s)?`,
+      confirm: () =>
+        radarrApi
+          .deleteFiles(files.map((f) => f.id || -1))
+          .then(() => (radarrFiles = getFiles(radarrItem)))
+    });
+  }
+
+  function createConfirmCancelDownloadsDialog(downloads: MovieDownload[]) {
+    createModal(ConfirmDialog, {
+      header: 'Cancel Season Downloads?',
+      body: `Are you sure you want to cancel all ${downloads.length} download(s)?`,
+      confirm: () =>
+        radarrApi
+          .cancelDownloads(downloads.map((f) => f.id || -1))
+          .then(() => (radarrDownloads = getDownloads(radarrItem)))
+    });
+  }
+
+const onGrabRelease = () => setTimeout(() => (radarrDownloads = getDownloads(radarrItem)), 8000);
+
+async function editRadarrParameters() {
+    try {
+        const [tmdbMovieData, radarrItemData] = await Promise.all([tmdbMovie, radarrItem]);
+
+        if (!radarrItemData?.id) {
+            throw new Error("The movie does not exist in Radarr.");
+        }
+
+        createModal(MMEditToRadarrDialog, {
+            title: tmdbMovieData?.title || '',
+            radarrItem: radarrItemData,
+            backdropUri: tmdbMovieData?.backdrop_path || ''
+        });
+    } catch (error) {
+        createErrorDialog('Error while editing Radarr parameters', editRadarrParameters);
+    }
+}
+
+async function downloadManually() {
+    try {
+        let radarrItemData = await radarrItemP;
+
+        if (!radarrItemData || !radarrItemData.id) {
+            radarrItemData = await getOrAddMovieToRadarr(tmdbId, tmdbMovie.title);
+        }
+
+        if (radarrItemData && radarrItemData.id) {
+            createModal(MovieMediaManagerModal, { radarrItem: radarrItemData, onGrabRelease });
+        } else {
+            throw new Error('Radarr item is invalid or missing ID.');
+        }
+    } catch (error) {
+        console.error('Error during manual download:', error);
+        createErrorDialog('Error during manual download', downloadManually);
+    }
+}
 </script>
 
 <DetachedPage let:handleGoBack let:registrar>
@@ -156,6 +217,11 @@
 										>{movie.vote_average?.toFixed(1)} TMDB</a
 									>
 								</p>
+                {#if $pendingRequest}
+                <div class="py-0.10 px-3 rounded-lg" style="color: white; background-color: #ffa500; border-radius: 20px; display: inline-block; font-size: 0.75rem;">
+                  Requested
+                </div>
+                {/if}
 							</div>
 							<div class="text-stone-300 font-medium line-clamp-3 opacity-75 max-w-4xl mt-4">
 								{movie.overview}
@@ -180,10 +246,24 @@
 									<Play size={19} slot="icon" />
 								</Button>
 							{/if}
-							<Button class="mr-4" action={handleRequest}>
-								Request
-								<Plus size={19} slot="icon" />
-							</Button>
+							{#if !$requestExists && !jellyfinItem}
+              <Button class="mr-4" on:clickOrSelect={() => handleMediaRequest("movie",$tmdbMovieData, currentUser, checkRequests)} disabled={!allowRequests}>
+                Request
+                <Plus size={19} slot="icon" />
+              </Button>              
+              {/if}
+              {#if currentUser?.isAdmin && radarrItem}
+                <Button class="mr-4" on:clickOrSelect={editRadarrParameters} disabled={!allowRequests}>
+                  Edit
+                  <Pencil2 size={19} slot="icon" />
+                </Button>
+              {/if}
+              {#if currentUser?.isAdmin && radarrItem}
+                <Button class="mr-4" on:clickOrSelect={downloadManually} disabled={!allowRequests}>
+                  Search Manually
+                  <Reload size={19} slot="icon" />
+                </Button>
+              {/if}
 							<!--{#if radarrItem}-->
 							<!--	<Button class="mr-4" on:clickOrSelect={() => openMovieMediaManager(Number(id))}>-->
 							<!--		{#if jellyfinItem}-->
@@ -235,6 +315,16 @@
 					{/each}
 				</Carousel>
 			{/await}
+      {#await collection then collectionData}
+      {#if collectionData}
+        <Carousel scrollClass="px-32" class="mb-8">
+          <div slot="header">{collectionData.name}</div>
+          {#each collectionData.parts as part}
+            <TmdbCard item={part} on:enter={scrollIntoView({ horizontal: 128 })} />
+          {/each}
+        </Carousel>
+      {/if}
+    {/await}
 		</Container>
 		{#await tmdbMovie then movie}
 			<Container class="flex-1 bg-secondary-950 pt-8 px-32" on:enter={scrollIntoView({ top: 0 })}>

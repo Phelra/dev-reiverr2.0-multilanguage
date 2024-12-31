@@ -10,7 +10,7 @@
 	import { jellyfinApi } from '../apis/jellyfin/jellyfin-api';
 	import { playerState } from '../components/VideoPlayer/VideoPlayer';
 	import { formatSize, retry, timeout } from '../utils';
-	import { createModal } from '../components/Modal/modal.store';
+	import { createModal, modalStack } from '../components/Modal/modal.store';
 	import ButtonGhost from '../components/Ghosts/ButtonGhost.svelte';
 	import {
 		type EpisodeFileResource,
@@ -18,14 +18,15 @@
 		type SonarrEpisode,
 		type SonarrSeries
 	} from '../apis/sonarr/sonarr-api';
-	import MMAddToSonarrDialog from '../components/MediaManagerModal/MMAddToSonarrDialog.svelte';
-	import SonarrMediaManagerModal from '../components/MediaManagerModal/SonarrMediaManagerModal.svelte';
 	import ConfirmDialog from '../components/Dialog/ConfirmDialog.svelte';
-	import { tick } from 'svelte';
+	import { writable, get } from 'svelte/store';
+	import { user } from '../stores/user.store';
+	import { handleRequestEpisode } from '../components/Requests/requestProcess';
 
 	export let id: string; // Series ID
-	export let season: string;
-	export let episode: string;
+	export let season: number;
+	export let episode: number;
+	const currentUser = get(user);
 
 	let isWatched = false;
 
@@ -63,37 +64,6 @@
 			return sonarrApi
 				.getEpisodes(sonarrItem.id, Number(season))
 				.then((episodes) => episodes.find((e) => e.episodeNumber === Number(episode)));
-		});
-	}
-
-	async function handleAddedToSonarr() {
-		sonarrItem = sonarrApi.getSeriesByTmdbId(Number(id));
-		return retry(() => getSonarrEpisode(sonarrItem)).then((sonarrEpisode) => {
-			sonarrEpisode &&
-				createModal(SonarrMediaManagerModal, {
-					sonarrItem: sonarrEpisode,
-					onGrabRelease: () => {}
-				});
-		});
-	}
-
-	async function handleRequestEpisode() {
-		return Promise.all([sonarrEpisode, tmdbEpisode]).then(([sonarrEpisode, tmdbEpisode]) => {
-			if (sonarrEpisode) {
-				createModal(SonarrMediaManagerModal, {
-					sonarrItem: sonarrEpisode,
-					onGrabRelease: () => {} // TODO
-				});
-			} else if (tmdbEpisode) {
-				createModal(MMAddToSonarrDialog, {
-					tmdbId: Number(id),
-					backdropUri: tmdbEpisode.still_path || '',
-					title: tmdbEpisode.name || '',
-					onComplete: handleAddedToSonarr
-				});
-			} else {
-				console.error('No series found');
-			}
 		});
 	}
 
@@ -202,10 +172,18 @@
 							<Check slot="icon" size={19} />
 						</Button>
 					{:else}
-						<Button action={handleRequestEpisode}>
-							Request
-							<Plus size={19} slot="icon" />
-						</Button>
+					<Button
+					class="mr-4"
+					on:click={() => handleRequestEpisode(
+						id, 
+						season, 
+						episode,
+						currentUser
+						)}
+					>
+						Request
+					<Plus size={19} slot="icon" />
+					</Button>
 					{/if}
 				{/await}
 				<!--				<Button-->

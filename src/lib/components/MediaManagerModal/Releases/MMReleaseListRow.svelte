@@ -36,17 +36,23 @@
 		{formatSize(release.size || 0)}
 	</TableCell>
 	<TableCell class="text-zinc-300">
-		<div
-			class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm"
-		>
+		<div class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm">
 			{release.seeders} / {release.leechers}
 		</div>
 	</TableCell>
 	<TableCell class="text-zinc-300">
-		<div
-			class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm"
-		>
+		<div class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm">
 			{release.quality?.quality?.name}
+		</div>
+	</TableCell>
+	<TableCell class="text-zinc-300">
+		<div class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm">
+			{release.customFormatScore}
+		</div>
+	</TableCell>
+	<TableCell class="text-zinc-300">
+		<div class="px-3 py-1 rounded bg-secondary-700 flex items-center justify-center float-left text-sm">
+			{release.indexer}
 		</div>
 	</TableCell>
 	<TableCell>

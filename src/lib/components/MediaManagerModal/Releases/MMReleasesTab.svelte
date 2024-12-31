@@ -8,14 +8,13 @@
 	import type { GrabReleaseFn } from '../MediaManagerModal';
 	import Container from '../../../../Container.svelte';
 	import TableHeaderCell from '../../Table/TableHeaderCell.svelte';
-	import MMTitle from '../MMTitle.svelte';
 
 	type Release = RadarrRelease | SonarrRelease;
 
 	export let releases: Promise<Release[]>;
 	export let grabRelease: GrabReleaseFn;
 
-	let sortBy: 'size' | 'quality' | 'seeders' | 'age' | undefined = 'seeders';
+	let sortBy: 'size' | 'quality' | 'seeders' | 'age' | 'customFormatScore' | 'indexer' | undefined = 'seeders';
 	let sortDirection: 'asc' | 'desc' = 'desc';
 
 	function getRecommendedReleases(releases: Release[]) {
@@ -23,6 +22,8 @@
 		let filtered = releases.slice();
 
 		const releaseIsEnough = (r: Release) => r?.quality?.quality?.resolution || 0 > 720;
+
+		filtered.sort((a, b) => b.customFormatScore - a.customFormatScore);
 		filtered.sort((a, b) => (b.seeders || 0) - (a.seeders || 0));
 		filtered.sort((a, b) => (releaseIsEnough(b) ? 1 : 0) - (releaseIsEnough(a) ? 1 : 0));
 		filtered = filtered.slice(0, 5);
@@ -55,6 +56,12 @@
 			if (sb === 'seeders') {
 				return (sd === 'asc' ? 1 : -1) * ((a.seeders || 0) - (b.seeders || 0));
 			}
+			if (sb === 'customFormatScore') {
+				return (sd === 'asc' ? 1 : -1) * (a.customFormatScore - b.customFormatScore);
+			}
+			if (sb === 'indexer') {
+				return (sd === 'asc' ? 1 : -1) * ((a.indexer?.toLowerCase() || '').localeCompare(b.indexer?.toLowerCase() || ''));
+			}
 			if (sb === 'age') {
 				return (sd === 'asc' ? 1 : -1) * ((b.ageHours || 0) - (a.ageHours || 0));
 			}
@@ -79,24 +86,26 @@
 				</div>
 			{/each}
 		{:then releases}
-			<div class="grid grid-cols-[1fr_max-content_max-content_max-content_max-content] gap-y-4">
+			<div class="grid grid-cols-[1fr_max-content_max-content_max-content_max-content_max-content_max-content] gap-y-4">
 				<TableHeaderRow>
 					<TableHeaderSortBy
 						icon={sortBy === 'age' ? sortDirection : undefined}
-						on:clickOrSelect={toggleSortBy('age')}>Age</TableHeaderSortBy
-					>
+						on:clickOrSelect={toggleSortBy('age')}>Age</TableHeaderSortBy>
 					<TableHeaderSortBy
 						icon={sortBy === 'size' ? sortDirection : undefined}
-						on:clickOrSelect={toggleSortBy('size')}>Size</TableHeaderSortBy
-					>
+						on:clickOrSelect={toggleSortBy('size')}>Size</TableHeaderSortBy>
 					<TableHeaderSortBy
 						icon={sortBy === 'seeders' ? sortDirection : undefined}
-						on:clickOrSelect={toggleSortBy('seeders')}>Peers</TableHeaderSortBy
-					>
+						on:clickOrSelect={toggleSortBy('seeders')}>Peers</TableHeaderSortBy>
 					<TableHeaderSortBy
 						icon={sortBy === 'quality' ? sortDirection : undefined}
-						on:clickOrSelect={toggleSortBy('quality')}>Quality</TableHeaderSortBy
-					>
+						on:clickOrSelect={toggleSortBy('quality')}>Quality</TableHeaderSortBy>
+					<TableHeaderSortBy
+						icon={sortBy === 'customFormatScore' ? sortDirection : undefined}
+						on:clickOrSelect={toggleSortBy('customFormatScore')}>Score</TableHeaderSortBy>
+					<TableHeaderSortBy
+						icon={sortBy === 'indexer' ? sortDirection : undefined}
+						on:clickOrSelect={toggleSortBy('indexer')}>Indexer</TableHeaderSortBy>
 					<TableHeaderCell />
 				</TableHeaderRow>
 
@@ -106,7 +115,7 @@
 					{/each}
 				</Container>
 
-				<h1 class="text-2xl font-semibold mb-4 mt-8 col-span-5 mx-12">All Releases</h1>
+				<h1 class="text-2xl font-semibold mb-4 mt-8 col-span-7 mx-12">All Releases</h1>
 
 				{#each releases
 					.filter((r) => r.guid && r.indexerId)
